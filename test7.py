@@ -11,13 +11,15 @@ import mido
 import sig_gen as sg
 import kaleidoscope as kal
 
+winw, winh = 600, 600
+win_canvas = np.zeros((winh, winw, 3), dtype=np.float32)
 w, h = 600, 600
 numpix = w * h
 
 updatespeed = 66 # in ms
 px_scan_speed = 50#545.5 #px/ms
 
-kaleidoscopes = [None, kal.kaleidoscope_levels, kal.multiscope]
+kaleidoscopes = [None, kal.multiscope, kal.kaleidoscope_levels]
 K_ix = 0
 k_n_segments = 1
 k_flipped = 0
@@ -26,14 +28,14 @@ k_alternate_flipped = False
 # K_inv = False
 # k_level = 1
 
-rchannel = sg.SignalGenerator(sg.sin, numpix, 10, id="red")
-gchannel = sg.SignalGenerator(sg.sin, numpix, 10, id="green")
-bchannel = sg.SignalGenerator(sg.sin, numpix, 10, id="blue")
+rchannel = sg.SignalGenerator(sg.sin, numpix, 1, id="red")
+gchannel = sg.SignalGenerator(sg.sin, numpix, 1, id="green")
+bchannel = sg.SignalGenerator(sg.sin, numpix, 1, id="blue")
 
-increments = 100
+increments = 1
 
 i = 0
-pix = np.ones((w * h * 3)).astype(np.float32)
+pix = np.ones((w * h * 3), dtype=np.float32)
 
 t1 = time.time()
 
@@ -43,7 +45,7 @@ def showBlankScreen():
 
 
 def computePixels():
-    global i, pix, t1, updatespeed, px_scan_speed, K_ix, k_n_segments, k_flipped, k_alternate_flipped
+    global i, pix, t1, updatespeed, px_scan_speed, K_ix, k_n_segments, k_flipped, k_alternate_flipped, win_canvas, winw, winh, w, h
     # i am at
     n_scanned_px = updatespeed * px_scan_speed
 
@@ -55,16 +57,45 @@ def computePixels():
     if K_ix > 0:
         rgb = kaleidoscopes[K_ix](rgb, k_n_segments, k_flipped, k_alternate_flipped)
     # rgb = kal.kaleidoscope_levels(rgb, level=k_level, flipped=K_inv)
-    rgb = rgb.reshape(-1)
+    assert rgb.shape == (w, h, 3)
+    leftover_w = winw - w
+    left = int(leftover_w / 2)
+    right = leftover_w - left
+    
+    
+    leftover_h = winh - h
+    top = int(leftover_h / 2)
+    bottom = leftover_h - top
+    
+    
+    win_canvas[top:(top + h), left:(left + w), :] = rgb
+    
+    #print(leftover_w, leftover_h, left, top, w, h, winw, winh, (left + w))
+    if False:
+        if left > 1:
+            #print(rgb[:, 0:left, :].shape)
+            #print(rgb[:, 0:left:-1, :].shape)
+            win_canvas[:, 0:left, :] = rgb[:, 0:left, :][:,::-1,:]
+            win_canvas[:, (winw - right):winw, :] = rgb[:, (w - right):w, :][:,::-1,:]
+        if top > 1:
+            win_canvas[0:top, :, :] = rgb[0:top, :, :][::-1,:,:]
+            win_canvas[(winh - bottom):winh, :, :] = rgb[(h - bottom):h, :, :][::-1,:,:]
+
+
+    
+    #rgb = rgb.reshape(-1)
+    
+    
     GLUT.glutPostRedisplay()
-    return rgb
+    return win_canvas
 
 
 def draw():
-    global t1, updatespeed
+    global t1, updatespeed, winw, winh, w, h
     GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
     pix = computePixels()
-    GL.glDrawPixels(w, h, GL.GL_RGB, GL.GL_FLOAT, pix.data)
+    assert pix.shape == (winh, winw, 3)
+    GL.glDrawPixels(winw, winh, GL.GL_RGB, GL.GL_FLOAT, pix.reshape(-1).data)
     GL.glFlush()
     #print(f"flip took {(time.time() - t1)}")
     updatespeed = int(((time.time() - t1)) * 1000)
@@ -239,15 +270,34 @@ for i in range(15):
 
 
 
+def reshape_me(newWidth, newHeight):
+    global w, h, numpix, rchannel, bchannel, gchannel, winw, winh, win_canvas
+    
+    winw, winh = newWidth, newHeight
+    win_canvas = np.zeros((winw, winh, 3), dtype=np.float32)
+    w, h = newWidth, newHeight
+    if w < h:
+        h = w
+    else:
+        w = h
+    print(winw, winh, w, h)
+    numpix = w * h
+    rchannel.numpix = numpix
+    bchannel.numpix = numpix
+    gchannel.numpix = numpix
+    GLUT.glutPostRedisplay()
+    return None
+
 
 
 port.callback = handle_midi
 
 GLUT.glutInit()  # Initialize a glut instance which will allow us to customize our window
 GLUT.glutInitDisplayMode(GLUT.GLUT_RGB)  # Set the display mode to be colored
-GLUT.glutInitWindowSize(600, 600)   # Set the width and height of your window
+GLUT.glutInitWindowSize(w, h)   # Set the width and height of your window
 GLUT.glutInitWindowPosition(0, 0)   # Set the position at which this windows should appear
 wind = GLUT.glutCreateWindow("It's the Vizard")  # Give your window a title
+GLUT.glutReshapeFunc(reshape_me)
 #GLUT.glutMouseFunc(mouseFunc)
 #GLUT.glutPassiveMotionFunc(on_motion)
 GLUT.glutKeyboardFunc(on_key)
