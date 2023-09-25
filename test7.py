@@ -19,11 +19,13 @@ numpix = w * h
 updatespeed = 66 # in ms
 px_scan_speed = 50#545.5 #px/ms
 
-kaleidoscopes = [None, kal.multiscope, kal.kaleidoscope_levels]
 K_ix = 0
 k_n_segments = 1
 k_flipped = 0
-k_alternate_flipped = False
+k_alternate_flipped = 1
+kaleidoscopes = [None,
+                 kal.Multiscope(k_flipped, w, k_n_segments, k_alternate_flipped),
+                 kal.Recurseoscope(k_flipped, w, k_n_segments)]
 
 # K_inv = False
 # k_level = 1
@@ -55,7 +57,7 @@ def computePixels():
     
     rgb = np.array([r, g, b]).T.reshape(w, h, 3)
     if K_ix > 0:
-        rgb = kaleidoscopes[K_ix](rgb, k_n_segments, k_flipped, k_alternate_flipped)
+        rgb = kaleidoscopes[K_ix].kaleide(rgb)
     # rgb = kal.kaleidoscope_levels(rgb, level=k_level, flipped=K_inv)
     assert rgb.shape == (w, h, 3)
     leftover_w = winw - w
@@ -231,12 +233,17 @@ def handle_midi(message):
     elif message.control == 5:
         if message.channel == 0:
             k_n_segments = int(message.value/12)
+            kaleidoscopes[2].n_segments = k_n_segments
+            #print(message, k_n_segments)
+            kaleidoscopes[1].n_segments = k_n_segments
             print("k_n_segments", k_n_segments)
 
     # Kaleidoscope Flips
     elif message.control == 6:
         if message.channel == 0:
             k_flipped = int(message.value/17)
+            kaleidoscopes[1].flipped = k_flipped
+            kaleidoscopes[2].flipped = k_flipped
             print("k_flipped:", k_flipped)
 
     # Control Increments
@@ -249,6 +256,7 @@ def handle_midi(message):
     elif message.control == 10:
         if message.channel == 0:
             k_alternate_flipped = int(message.value/17)
+            kaleidoscopes[1].alternate_flip = k_alternate_flipped
             print("k_alternate_flipped:", k_alternate_flipped)
 
 
