@@ -107,8 +107,6 @@ class Recurseoscope(Kaleidoscope):
         super(Recurseoscope, self).__init__(flipped, size)
         self.n_segments = n_segments
         self.size = size / 2
-        
-        print(self.fmask.shape)
 
     def kaleide(self, img):
         #assert img.shape == (self.size, self.size, 3)
@@ -126,7 +124,7 @@ class Multiscope(Kaleidoscope):
         self._alternate_flip = None
         self.alternate_flip = alternate_flip
         #self.fmask2 = self.set_mask(alternate_flip)
-        self.quick = False
+        self.quick = True
         
         self.segments = None
         self._n_segments = None
@@ -154,13 +152,19 @@ class Multiscope(Kaleidoscope):
     def n_segments(self, n_segments):
         self._n_segments = n_segments
         self.seg_size = int(self.full_size / self.n_segments)
-        self.set_segments()
         #if self.n_segments == 0:
+        segm = self.get_segments()
+        
+        if self.seg_size % 2 == 0:
+            quick = True
+            size = self.seg_size / 2
+        else:
+            quick = False
+            size = self.seg_size
             
-        self.size = self.seg_size / 2
-        if self.seg_size % 2 != 0:
-            self.quick = True
-            self.size = self.seg_size / 4
+        self.quick = quick
+        self.segments = segm
+        self.size = size
 
 
     @property
@@ -172,32 +176,43 @@ class Multiscope(Kaleidoscope):
         self._alternate_flip = alternate_flip
         self.fmask2 = self.set_mask(alternate_flip)
 
-    def set_segments(self):
-        self.segments = np.arange(self.n_segments + 1, dtype=int) * self.seg_size
+    def get_segments(self):
+        return np.arange(self.n_segments + 1, dtype=int) * self.seg_size
 
 
     def kaleide(self, img):
+        # This shit is necessary so that the midi callbacks dont change these variables 
+        # under my butt while I'm computing. Its very gross!
+        segm = self.segments
+        fmask1 = self.fmask
+        fmask2 = self.fmask2
+        quick = self.quick
+        n_segments = self.n_segments
+        
+        #print(segm, self.quick, self.seg_size, self.size, self.full_size, self.n_segments)
         if self.n_segments == 0:
             return img
         cnt = 0
-        for i in range(1, self.n_segments + 1):
-            for j in range(1, self.n_segments + 1):
+
+        for i in range(1, n_segments + 1):
+            for j in range(1, n_segments + 1):
                 if cnt % 2 == 0:
-                    thisflip = self.fmask
+                    thisflip = fmask1
                 else:
-                    thisflip = self.fmask2
-                if self.quick:
-                    img[self.segments[i - 1]:self.segments[i],
-                        self.segments[j - 1]:self.segments[j], :] = \
-                            self.kaleidobase(img[self.segments[i - 1]:self.segments[i],
-                                                 self.segments[j - 1]:self.segments[j], :],
-                                             fmask=thisflip)[::2, ::2, :]
-                else:
-                    img[self.segments[i - 1]:self.segments[i],
-                        self.segments[j - 1]:self.segments[j], :] = \
-                            self.kaleidobase(img[self.segments[i - 1]:self.segments[i]:2,
-                                                 self.segments[j - 1]:self.segments[j]:2, :],
+                    thisflip = fmask2
+                if quick:
+                    img[segm[i - 1]:segm[i],
+                        segm[j - 1]:segm[j], :] = \
+                            self.kaleidobase(img[segm[i - 1]:segm[i]:2,
+                                                 segm[j - 1]:segm[j]:2, :],
                                              fmask=thisflip)
+                else:
+
+                    img[segm[i - 1]:segm[i],
+                        segm[j - 1]:segm[j], :] = \
+                            self.kaleidobase(img[segm[i - 1]:segm[i],
+                                                 segm[j - 1]:segm[j], :],
+                                             fmask=thisflip)[::2, ::2, :]
                 cnt += 1
         return img
 

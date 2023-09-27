@@ -17,7 +17,7 @@ def normalize_pixels(pixels):
 
 
 def square_wave(t):
-    px = np.floor(np.sin(t))
+    px = np.ceil(np.sin(t))
     # already 0 or 1
     return px
 

@@ -11,10 +11,10 @@ import mido
 import sig_gen as sg
 import kaleidoscope as kal
 
-winw, winh = 600, 600
-win_canvas = np.zeros((winh, winw, 3), dtype=np.float32)
-w, h = 600, 600
-numpix = w * h
+WINW, WINH = 600, 600
+win_canvas = np.zeros((WINH, WINW, 3), dtype=np.float32)
+W, H = 600, 600
+numpix = W * H
 
 updatespeed = 66 # in ms
 px_scan_speed = 50#545.5 #px/ms
@@ -24,8 +24,8 @@ k_n_segments = 1
 k_flipped = 0
 k_alternate_flipped = 1
 kaleidoscopes = [None,
-                 kal.Multiscope(k_flipped, w, k_n_segments, k_alternate_flipped),
-                 kal.Recurseoscope(k_flipped, w, k_n_segments)]
+                 kal.Multiscope(k_flipped, W, k_n_segments, k_alternate_flipped),
+                 kal.Recurseoscope(k_flipped, W, k_n_segments)]
 
 # K_inv = False
 # k_level = 1
@@ -37,7 +37,7 @@ bchannel = sg.SignalGenerator(sg.sin, numpix, 1, id="blue")
 increments = 1
 
 i = 0
-pix = np.ones((w * h * 3), dtype=np.float32)
+pix = np.ones((W * H * 3), dtype=np.float32)
 
 t1 = time.time()
 
@@ -47,14 +47,19 @@ def showBlankScreen():
 
 
 def computePixels():
-    global i, pix, t1, updatespeed, px_scan_speed, K_ix, k_n_segments, k_flipped, k_alternate_flipped, win_canvas, winw, winh, w, h
+    global i, pix, t1, updatespeed, px_scan_speed, K_ix, k_n_segments, k_flipped, k_alternate_flipped, win_canvas, WINW, WINH, W, H
+    w = W
+    h = H
+    winw = WINW
+    winh = WINH
+
     # i am at
     n_scanned_px = updatespeed * px_scan_speed
 
     r = rchannel.get_series(n_scanned_px)
     g = gchannel.get_series(n_scanned_px)
     b = bchannel.get_series(n_scanned_px)
-    
+
     rgb = np.array([r, g, b]).T.reshape(w, h, 3)
     if K_ix > 0:
         rgb = kaleidoscopes[K_ix].kaleide(rgb)
@@ -63,16 +68,15 @@ def computePixels():
     leftover_w = winw - w
     left = int(leftover_w / 2)
     right = leftover_w - left
-    
-    
+
     leftover_h = winh - h
     top = int(leftover_h / 2)
     bottom = leftover_h - top
-    
-    
+
+    print(leftover_w, leftover_h, left, top, w, h, winw, winh, (left + w))
+    win_canvas = np.zeros((winh, winw, 3), dtype=np.float32)
     win_canvas[top:(top + h), left:(left + w), :] = rgb
-    
-    #print(leftover_w, leftover_h, left, top, w, h, winw, winh, (left + w))
+
     if False:
         if left > 1:
             #print(rgb[:, 0:left, :].shape)
@@ -93,11 +97,11 @@ def computePixels():
 
 
 def draw():
-    global t1, updatespeed, winw, winh, w, h
+    global t1, updatespeed, WINW, WINH, W, H
     GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
     pix = computePixels()
-    assert pix.shape == (winh, winw, 3)
-    GL.glDrawPixels(winw, winh, GL.GL_RGB, GL.GL_FLOAT, pix.reshape(-1).data)
+    assert pix.shape == (WINH, WINW, 3)
+    GL.glDrawPixels(WINW, WINH, GL.GL_RGB, GL.GL_FLOAT, pix.reshape(-1).data)
     GL.glFlush()
     #print(f"flip took {(time.time() - t1)}")
     updatespeed = int(((time.time() - t1)) * 1000)
@@ -130,7 +134,7 @@ def on_key(key, x, y):
     if key == b"a":
         rchannel.freq -= increments
         rchannel.print_freq()
-    if key == b"w":
+    if key == b"W":
         gchannel.freq += increments
         gchannel.print_freq()
     if key == b"s":
@@ -188,7 +192,7 @@ def print_message(message):
 
 
 def handle_midi(message):
-    global wind,rchannel, bchannel, gchannel, px_scan_speed, waveform_r, K_ix, increments, k_n_segments, k_flipped, k_alternate_flipped
+    global wind, rchannel, bchannel, gchannel, px_scan_speed, waveform_r, K_ix, increments, k_n_segments, k_flipped, k_alternate_flipped
     # RED Channel
     if message.control == 0:
         if message.channel == 0:
@@ -218,8 +222,10 @@ def handle_midi(message):
         if message.channel == 0:
             px_scan_speed = message.value * increments
             print("px_scan_speed:", px_scan_speed)
-        else:
-            pass
+        elif (message.channel == 1) and (message.value == 0):
+            rchannel.state = 0
+            bchannel.state = 0
+            gchannel.state = 0
 
     # Kaleidoscope Switcher
     elif message.control == 4:
@@ -279,17 +285,17 @@ for i in range(15):
 
 
 def reshape_me(newWidth, newHeight):
-    global w, h, numpix, rchannel, bchannel, gchannel, winw, winh, win_canvas
+    global W, H, numpix, rchannel, bchannel, gchannel, WINW, WINH, win_canvas
     
-    winw, winh = newWidth, newHeight
-    win_canvas = np.zeros((winw, winh, 3), dtype=np.float32)
-    w, h = newWidth, newHeight
-    if w < h:
-        h = w
+    WINW, WINH = newWidth, newHeight
+    win_canvas = np.zeros((WINW, WINH, 3), dtype=np.float32)
+    W, H = newWidth, newHeight
+    if W < H:
+        H = W
     else:
-        w = h
-    print(winw, winh, w, h)
-    numpix = w * h
+        W = H
+    print(WINW, WINH, W, H)
+    numpix = W * H
     rchannel.numpix = numpix
     bchannel.numpix = numpix
     gchannel.numpix = numpix
@@ -302,7 +308,7 @@ port.callback = handle_midi
 
 GLUT.glutInit()  # Initialize a glut instance which will allow us to customize our window
 GLUT.glutInitDisplayMode(GLUT.GLUT_RGB)  # Set the display mode to be colored
-GLUT.glutInitWindowSize(w, h)   # Set the width and height of your window
+GLUT.glutInitWindowSize(W, H)   # Set the width and height of your window
 GLUT.glutInitWindowPosition(0, 0)   # Set the position at which this windows should appear
 wind = GLUT.glutCreateWindow("It's the Vizard")  # Give your window a title
 GLUT.glutReshapeFunc(reshape_me)
