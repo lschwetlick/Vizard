@@ -43,13 +43,24 @@ def triangle(t):
 
 
 class SignalGenerator():
-    def __init__(self, waveform, numpix, freq, id=""):
-        self.waveform = waveform
-        self.numpix = numpix
+    def __init__(self, waveforms, numpix, freq, id=""):
+        self.waveforms = waveforms
+        self._waveform_ix = 0
+        self._waveform = self.waveforms[self.waveform_ix]
+        self._numpix = numpix
         self._freq = freq
         self.state = 0
         self.id = id
         self.ref_t = np.linspace(0, (self.freq * (2 * np.pi)), num=self.numpix, dtype=np.float32)
+
+    @property
+    def waveform_ix(self):
+        return(self._waveform_ix)
+
+    @waveform_ix.setter
+    def waveform_ix(self, waveform_ix):
+        self._waveform_ix = waveform_ix
+        self._waveform = self.waveforms[self._waveform_ix]
 
     @property
     def freq(self):
@@ -62,24 +73,25 @@ class SignalGenerator():
         # TODO: you could also precompute the Wavefunction by making one thats double as long and then just
         # indexing into the section you need
 
+    @property
+    def numpix(self):
+        return(self._numpix)
+
+    @numpix.setter
+    def numpix(self, numpix):
+        self._numpix = int(numpix)
+        self.ref_t = np.linspace(0, (self.freq * (2 * np.pi)), num=self.numpix, dtype=np.float32)
+        # TODO: you could also precompute the Wavefunction by making one thats double as long and then just
+        # indexing into the section you need
+
+
     def get_series(self, n_scanned_px):
         t = self.ref_t + self.state
-        px = self.waveform(t)
+        px = self._waveform(t)
         self.state = t[np.mod(int(n_scanned_px), self.numpix - 1)]
         return px
 
     def print_freq(self):
         print(self.id, " frequency: " , self.freq)
 
-    def cycle_waveform(self):
-        if self.waveform == sin:
-            self.waveform = square_wave
-        elif self.waveform == square_wave:
-            self.waveform = noise
-        elif self.waveform == noise:
-            self.waveform = constant
-        elif self.waveform == constant:
-            self.waveform = triangle
-        else:
-            self.waveform = sin
-        
+

@@ -106,9 +106,20 @@ class Recurseoscope(Kaleidoscope):
     def __init__(self, flipped, size, n_segments):
         super(Recurseoscope, self).__init__(flipped, size)
         self.n_segments = n_segments
-        self.size = size / 2
+        self._size = size / 2
+
+    @property
+    def size(self):
+        return(self._size)
+
+    @size.setter
+    def size(self, size):
+        if (size / 2) != self._size:
+            self._size = size / 2
+            self.fmask = self.set_mask(self.flipped)
 
     def kaleide(self, img):
+        #print(self.size)
         #assert img.shape == (self.size, self.size, 3)
         for _ in range(self.n_segments):
             img = img[::2, ::2, :]
@@ -151,20 +162,23 @@ class Multiscope(Kaleidoscope):
     @n_segments.setter
     def n_segments(self, n_segments):
         self._n_segments = n_segments
-        self.seg_size = int(self.full_size / self.n_segments)
-        #if self.n_segments == 0:
-        segm = self.get_segments()
-        
-        if self.seg_size % 2 == 0:
-            quick = True
-            size = self.seg_size / 2
+        if n_segments == 0:
+            pass
         else:
-            quick = False
-            size = self.seg_size
-            
-        self.quick = quick
-        self.segments = segm
-        self.size = size
+            self.seg_size = int(self.full_size / self.n_segments)
+            #if self.n_segments == 0:
+            segm = self.get_segments()
+
+            if self.seg_size % 2 == 0:
+                quick = True
+                size = self.seg_size / 2
+            else:
+                quick = False
+                size = self.seg_size
+
+            self.quick = quick
+            self.segments = segm
+            self.size = size
 
 
     @property
@@ -188,7 +202,7 @@ class Multiscope(Kaleidoscope):
         fmask2 = self.fmask2
         quick = self.quick
         n_segments = self.n_segments
-        
+
         #print(segm, self.quick, self.seg_size, self.size, self.full_size, self.n_segments)
         if self.n_segments == 0:
             return img
