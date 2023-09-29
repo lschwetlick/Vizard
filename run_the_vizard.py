@@ -5,18 +5,23 @@ from OpenGL import GLU
 from dataclasses import dataclass
 import time
 import sys
+import os
 import numpy as np
 
 import mido
 
 import sig_gen as sg
 import kaleidoscope as kal
-from viz_manager import Parameters, Vizard
+from viz_manager import Parameters, Vizard, MAPPING_turn, MAPPING_click
+import vizterm
+import prettytable
+
 
 VIZ = Vizard()
 
 t1 = time.time()
 updatespeed = 66 # in ms
+
 
 def computePixels():
     global updatespeed, VIZ
@@ -41,93 +46,91 @@ def draw():
     GL.glDrawPixels(VIZ._winw, VIZ._winh, GL.GL_RGB, GL.GL_FLOAT, pix.reshape(-1).data)
     GL.glFlush()
 
-    #print(f"flip took {(time.time() - t1)}")
+    ##print(f"flip took {(time.time() - t1)}")
     updatespeed = int(((time.time() - t1)) * 1000)
     t1 = time.time()
 
-def print_message(message):
-    print(message)
-
 
 def handle_midi(message):
-    #global wind, rchannel, bchannel, gchannel, px_scan_speed, waveform_r, K_ix, increments, k_n_segments, k_flipped, k_alternate_flipped
+    global VIZ, a1
+    dial = message.control
+    value = message.value
+    extra_message = "Extra"
+    if message.channel == 0:
+        name = MAPPING_turn[dial][0]
+        if MAPPING_turn[dial][1] == "inc":
+            value = int(value * VIZ.params.increments)
+        elif type(MAPPING_turn[dial][1]) == int:
+            value = int(value / MAPPING_turn[dial][1])
+        elif MAPPING_turn[dial][1] == "*6+1":
+            value = int((value * 6) + 1)
+        elif MAPPING_turn[dial][1] == "preset":
+            value = int(value)
+
+        VIZ.params.__setattr__(name, value)
+
+    elif (message.channel == 1) and (message.value == 0):
+        extra_message = f"regclick,, {VIZ.params.current_preset_num}"
+        name = MAPPING_click[dial][0]
+        if type(MAPPING_click[dial][1]) == int:
+            value = VIZ.params.__dict__[name] + MAPPING_click[dial][1]
+            VIZ.params.__setattr__(name, value)
+        elif MAPPING_click[dial][1] == "load":
+            #extra_message = "got load"
+            extra_message = VIZ.load_params_from_preset(VIZ.params.current_preset_num)
+        elif MAPPING_click[dial][1] == "save":
+            extra_message = VIZ.add_params_as_preset(VIZ.params.current_preset_num)
+        else:
+            MAPPING_click[dial][1](VIZ.params)
+
+    print_table(VIZ)
+    print(message)
+    print(extra_message)
+
+
+def VIZfind(name):
     global VIZ
-    # RED Channel
-    if message.control == 0:
-        if message.channel == 0:
-            VIZ.params.r_freq = message.value * VIZ.params.increments
-            print("rchannel.r_freq:", message.value * VIZ.params.increments)
-        if (message.channel == 1) and (message.value == 0):
-            VIZ.params.r_waveform_ix += 1
-            print("rchannel.waveform:", VIZ.params.r_waveform_ix)
-
-    # Green Channel
-    elif message.control == 1:
-        if message.channel == 0:
-            VIZ.params.g_freq = message.value * VIZ.params.increments
-            print("gchannel.gfreq:", message.value * VIZ.params.increments)
-        if (message.channel == 1) and (message.value == 0):
-            VIZ.params.g_waveform_ix += 1
-            print("gchannel.waveform:", VIZ.params.g_waveform_ix)
-
-    # Blue Channel
-    elif message.control == 2:
-        if message.channel == 0:
-            VIZ.params.b_freq = message.value * VIZ.params.increments
-            print("bchannel.bfreq:", message.value * VIZ.params.increments)
-        if (message.channel == 1) and (message.value == 0):
-            VIZ.params.b_waveform_ix += 1
-            print("bchannel.waveform:", VIZ.params.b_waveform_ix)
-    
-    # Scan Speed
-    elif message.control == 3:
-        if message.channel == 0:
-            VIZ.params.px_scan_speed = message.value * VIZ.params.increments
-            print("px_scan_speed:", VIZ.params.px_scan_speed)
-        elif (message.channel == 1) and (message.value == 0):
-            VIZ.params.rstate = 0
-            VIZ.params.gstate = 0
-            VIZ.params.bstate = 0
-            VIZ.params.update_state = True
-            print("RESET STATE")
-
-    # Control Increments
-    elif message.control == 7:
-        if message.channel == 0:
-            VIZ.params.increments = (int(message.value) * 6) + 1
-            print("increments:", VIZ.params.increments)
-            # VIZ.need_update = True
-
-
-    # Kaleidoscope Switcher
-    elif message.control == 4:
-        if (message.channel == 1) and (message.value == 0):
-            VIZ.params.kaleidoscope_ix = VIZ.params.kaleidoscope_ix + 1
-            print("Kaleidoscope", VIZ.params.kaleidoscope_ix)
-
-    # Kaleidoscope N Elements
-    elif message.control == 5:
-        if message.channel == 0:
-            k_n_segments = int(message.value / 12)
-            VIZ.params.k_n_segments = k_n_segments
-            print("k_n_segments", k_n_segments)
-
-    # Kaleidoscope Flips
-    elif message.control == 6:
-        if message.channel == 0:
-            k_flip = int(message.value / 17)
-            VIZ.params.k_flip = k_flip
-            print("k_flipped:", k_flip)
-
-    # Kaleidoscope Flips
-    elif message.control == 10:
-        if message.channel == 0:
-            k_alternate_flip = int(message.value / 17)
-            VIZ.params.k_alternate_flip = k_alternate_flip
-            print("k_alternate_flip:", k_alternate_flip)
+    if name == "":
+        return ""
+    elif name == "kaleidoscope_ix":
+        return VIZ.kal_names[VIZ.params.__dict__[name]]
+    elif name[2:6] == "wave":
+        return VIZ.waveforms_names[VIZ.params.__dict__[name]]
+    elif name == "Preset_save":
+        return "Save"
+    elif name == "Preset_load":
+        return "Load"
 
     else:
-        print(message)
+        return VIZ.params.__dict__[name]
+
+
+def print_table(VIZ):
+    #Color
+    R = "\033[0;31;40m" #RED
+    G = "\033[0;32;40m" # GREEN
+    Y = "\033[0;33;40m" # Yellow
+    B = "\033[0;34;40m" # Blue
+    N = "\033[0m" # Reset  
+    tab = prettytable.PrettyTable()
+    tab.hrules = 1
+    tab.header = False
+
+    for i in range(4):
+        r = []
+        for j in range(4):
+            r.append(R + MAPPING_turn[(i * 4) + j][3] + N)
+        tab.add_row(r)
+        r = []
+        for j in range(4):
+            r.append(VIZfind(MAPPING_turn[(i * 4) + j][0]))
+        tab.add_row(r)
+        r = []
+        for j in range(4):
+            r.append(VIZfind(MAPPING_click[(i * 4) + j][0]))
+        tab.add_row(r)
+    os.system('clear')
+    print(tab)
 
 
 def on_motion(x, y):
@@ -144,18 +147,6 @@ def on_motion(x, y):
     
 
 
-port = mido.open_input(callback=handle_midi)
-outport = mido.open_output()
-
-ll = [80, 50, 1, 70,
-      110, 110, 100, 70,
-      120, 120, 100, 120,
-      120, 120, 120, 120]
-for i in range(15):
-    msg = mido.Message('control_change', channel=1, control=i, value=ll[i], time=0)
-    outport.send(msg)
-
-
 
 def reshape_me(newWidth, newHeight):
     global VIZ
@@ -170,10 +161,40 @@ def reshape_me(newWidth, newHeight):
     return None
 
 
+def send_dataclass_to_midi(outport, params):
+    for chan in MAPPING_turn.keys():
+        name = MAPPING_turn[chan][0]
+        if name != "":
+            if MAPPING_turn[chan][1] == "inc":
+                val = int(params.__dict__[name] / params.increments)
+            elif type(MAPPING_turn[chan][1]) == int:
+                val = params.__dict__[name] * MAPPING_turn[chan][1]
+            elif MAPPING_turn[chan][1] == "*6+1":
+                val = int((params.__dict__[name] / 6) - 1)
+            elif MAPPING_turn[chan][1] == "preset":
+                val = int(params.__dict__[name])
+            # send value
+            msg = mido.Message('control_change', channel=0, control=chan, value=val, time=0)
+            outport.send(msg)
+        # send col
+        col = MAPPING_turn[chan][2]
+        msg = mido.Message('control_change', channel=1, control=chan, value=col, time=0)
+        outport.send(msg)
+
+# print(VIZ.presets["0"])
+# print(Parameters().to_dict())
+# aa = Parameters.from_dict(Parameters().to_dict())
+# print(aa)
 
 
+port = mido.open_input(callback=handle_midi)
+outport = mido.open_output()
+
+print(VIZ.params)
+send_dataclass_to_midi(outport, VIZ.params)
 
 
+print_table(VIZ)
 port.callback = handle_midi
 
 GLUT.glutInit()  # Initialize a glut instance which will allow us to customize our window

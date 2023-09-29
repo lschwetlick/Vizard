@@ -2,6 +2,57 @@ from dataclasses import dataclass
 import sig_gen as sg
 import kaleidoscope as kal
 import numpy as np
+import json
+
+PRESETFILE = "preset_lib.json"
+
+
+def reset_states(p):
+    p.r_state = 0
+    p.g_state = 0
+    p.b_state = 0
+    p.update_state = True
+
+
+MAPPING_turn = {
+    0: ("r_freq", "inc", 80, "Red"),
+    1: ("g_freq", "inc", 50, "Green"),
+    2: ("b_freq", "inc", 1, "Blue"),
+    3: ("px_scan_speed", "inc", 70, "Scan"),
+    4: ("", "", 110, "Kal"),
+    5: ("k_n_segments", 12, 110, "Segments"),
+    6: ("k_flip", 17, 100, "Flip"),
+    7: ("increments", "*6+1", 70, "increments"),
+    8: ("", "", 120, ""),
+    9: ("", "", 120, ""),
+    10: ("k_alternate_flip", 17, 100, "Flip 2"),
+    11: ("", "", 120, ""),
+    12: ("", "", 1, ""),
+    13: ("", "", 1, ""),
+    14: ("", "", 60, ""),
+    15: ("current_preset_num", "preset", 60, "Preset")
+}
+
+MAPPING_click = {
+    0: ("r_waveform_ix", 1, 80),
+    1: ("g_waveform_ix", 1, 50),
+    2: ("b_waveform_ix", 1, 1),
+    3: ("update_state", reset_states, 70),
+    4: ("kaleidoscope_ix", 1, 120),
+    5: ("", "", 120),
+    6: ("", "", 120),
+    7: ("", "", 120),
+    8: ("", "", 120),
+    9: ("", "", 120),
+    10: ("", "", 120),
+    11: ("", "", 120),
+    12: ("", "", 120),
+    13: ("", "", 120),
+    14: ("Preset_save", "save", 60),
+    15: ("Preset_load", "load", 60)
+}
+
+
 
 @dataclass(unsafe_hash=True)
 class Parameters:
@@ -31,7 +82,8 @@ class Parameters:
 
     need_update: bool = False
     update_state: bool = False
-
+    
+    current_preset_num: int = 0
 
     def __setattr__(self, name, value):
         if name == "need_update":
@@ -39,6 +91,14 @@ class Parameters:
         else:
             super().__setattr__(name, value)
             self.need_update = True
+
+    @classmethod
+    def from_dict(cls, d):
+        instance = cls(**d)
+        return instance
+
+    def to_dict(self):
+        return self.__dict__
 
 
 class Vizard():
@@ -50,6 +110,8 @@ class Vizard():
         self._winw = self.params.winw
         self._numpix = self.params.w * self.params.h
 
+        self.waveforms_names = ["sin", "square", "noise",
+                                "constant", "triangle"]
         self.waveforms = [sg.sin, sg.square_wave,
                           sg.noise, sg.constant, sg.triangle]
 
@@ -67,10 +129,12 @@ class Vizard():
         self.kal2 = kal.Recurseoscope(self.params.k_flip, self.params.w,
                                       self.params.k_n_segments)
         self.kaleidoscopes = [None, self.kal1, self.kal2]
+        self.kal_names = ["None", "Multiscope", "Recurseoscope"]
 
         self.win_canvas = np.empty((self.params.winh, self.params.winw, 3),
                                    dtype=np.float32)
-
+        self.presets = {}
+        self.load_preset_lib()
 
     @property
     def k_ix(self):
@@ -80,6 +144,32 @@ class Vizard():
     def k_ix(self, k_ix):
         self._k_ix = k_ix % (len(self.kaleidoscopes))
         self.params.kaleidoscope_ix = k_ix % (len(self.kaleidoscopes))
+
+    def load_preset_lib(self):
+        print("Load Preset Lib")
+        with open(PRESETFILE, 'r') as f:
+            self.presets = json.load(f)
+
+    def save_preset_lib(self):
+        print("Save Preset Lib")
+        with open(PRESETFILE, 'w') as f:
+            json.dump(self.presets, f)
+
+    def add_params_as_preset(self, number):
+        p = self.params.to_dict().copy()
+        p["need_update"] = True
+        p["update_state"] = True
+        self.presets[str(number)] = p
+        self.save_preset_lib()
+        return f"Added new Preset in {number}"
+
+    def load_params_from_preset(self, number):
+        stay_at_n = self.params.current_preset_num
+        self.params = Parameters.from_dict(self.presets[str(number)])
+        self.params.need_update = True
+        self.params.update_state = True
+        self.params.current_preset_num = stay_at_n
+        return f"Loaded Preset from {number}"
 
     def update_params(self):
         if self.params.need_update:
@@ -112,9 +202,9 @@ class Vizard():
                 self.win_canvas = np.zeros((self.params.winh, self.params.winw, 3), dtype=np.float32)
 
             if self.params.update_state:
-                self.rchannel.state = self.params.rstate
-                self.gchannel.state = self.params.gstate
-                self.bchannel.state = self.params.bstate
+                self.rchannel.state = self.params.r_state
+                self.gchannel.state = self.params.g_state
+                self.bchannel.state = self.params.b_state
                 self.params.update_state = False
 
             self.params.need_update = False
