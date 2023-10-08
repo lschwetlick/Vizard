@@ -52,7 +52,7 @@ def draw():
 
 
 def handle_midi(message):
-    global VIZ, a1
+    global VIZ, a1, OUTPORT
     dial = message.control
     value = message.value
     extra_message = "Extra"
@@ -73,11 +73,12 @@ def handle_midi(message):
         extra_message = f"regclick,, {VIZ.params.current_preset_num}"
         name = MAPPING_click[dial][0]
         if type(MAPPING_click[dial][1]) == int:
-            value = VIZ.params.__dict__[name] + MAPPING_click[dial][1]
+            value = (VIZ.params.__dict__[name] + MAPPING_click[dial][1]) % len(VIZ.waveforms)
             VIZ.params.__setattr__(name, value)
         elif MAPPING_click[dial][1] == "load":
             #extra_message = "got load"
             extra_message = VIZ.load_params_from_preset(VIZ.params.current_preset_num)
+            send_dataclass_to_midi(OUTPORT, VIZ.params)
         elif MAPPING_click[dial][1] == "save":
             extra_message = VIZ.add_params_as_preset(VIZ.params.current_preset_num)
         else:
@@ -188,10 +189,10 @@ def send_dataclass_to_midi(outport, params):
 
 
 port = mido.open_input(callback=handle_midi)
-outport = mido.open_output()
+OUTPORT = mido.open_output()
 
 print(VIZ.params)
-send_dataclass_to_midi(outport, VIZ.params)
+send_dataclass_to_midi(OUTPORT, VIZ.params)
 
 
 print_table(VIZ)

@@ -128,8 +128,10 @@ class Vizard():
                                    self.params.k_alternate_flip)
         self.kal2 = kal.Recurseoscope(self.params.k_flip, self.params.w,
                                       self.params.k_n_segments)
-        self.kaleidoscopes = [None, self.kal1, self.kal2]
-        self.kal_names = ["None", "Multiscope", "Recurseoscope"]
+        self.kal3 = kal.KaleidoscopeMultiMirror(self.params.k_flip,
+                                                self.params.w)
+        self.kaleidoscopes = [None, self.kal1, self.kal2, self.kal3]
+        self.kal_names = ["None", "Multiscope", "Recurseoscope", "NEW"]
 
         self.win_canvas = np.empty((self.params.winh, self.params.winw, 3),
                                    dtype=np.float32)
@@ -187,9 +189,9 @@ class Vizard():
             self.gchannel.freq = self.params.g_freq
             self.bchannel.freq = self.params.b_freq
 
-            self.rchannel.waveform_ix = self.params.r_waveform_ix % len(self.waveforms)
-            self.gchannel.waveform_ix = self.params.g_waveform_ix % len(self.waveforms)
-            self.bchannel.waveform_ix = self.params.b_waveform_ix % len(self.waveforms)
+            self.rchannel.waveform_ix = self.params.r_waveform_ix #% len(self.waveforms)
+            self.gchannel.waveform_ix = self.params.g_waveform_ix #% len(self.waveforms)
+            self.bchannel.waveform_ix = self.params.b_waveform_ix #% len(self.waveforms)
 
             self.k_ix = self.params.kaleidoscope_ix
             for i in range(1, len(self.kaleidoscopes)):
