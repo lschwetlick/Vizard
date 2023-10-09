@@ -12,7 +12,7 @@ import mido
 
 import sig_gen as sg
 import kaleidoscope as kal
-from viz_manager import Parameters, Vizard, MAPPING_turn, MAPPING_click
+from viz_manager import Parameters, Vizard, MAPPING_turn, MAPPING_click, k_rot_map
 import vizterm
 import prettytable
 
@@ -21,7 +21,7 @@ VIZ = Vizard()
 
 t1 = time.time()
 updatespeed = 66 # in ms
-
+last8click = 0
 
 def computePixels():
     global updatespeed, VIZ
@@ -52,7 +52,7 @@ def draw():
 
 
 def handle_midi(message):
-    global VIZ, a1, OUTPORT
+    global VIZ, a1, OUTPORT, last8click
     dial = message.control
     value = message.value
     extra_message = "Extra"
@@ -66,8 +66,15 @@ def handle_midi(message):
             value = int((value * 6) + 1)
         elif MAPPING_turn[dial][1] == "preset":
             value = int(value)
+        elif MAPPING_turn[dial][1] == "k_manual_rot_curr":
+            value = k_rot_map(int(value))
+            name = "k_manual_rot_curr"
 
         VIZ.params.__setattr__(name, value)
+
+    elif (message.channel == 1) and (message.value == 127):
+        if MAPPING_click[dial][1] == "k_manual_rot":
+            last8click = time.time()
 
     elif (message.channel == 1) and (message.value == 0):
         extra_message = f"regclick,, {VIZ.params.current_preset_num}"
@@ -81,11 +88,19 @@ def handle_midi(message):
             send_dataclass_to_midi(OUTPORT, VIZ.params)
         elif MAPPING_click[dial][1] == "save":
             extra_message = VIZ.add_params_as_preset(VIZ.params.current_preset_num)
+        elif MAPPING_click[dial][1] == "k_manual_rot":
+            now = time.time()
+            extra_message = f"hello {now - last8click}"
+            if ((now - last8click) > 2) & ((now - last8click) < 10):
+                VIZ.params.k_manual_rot = ()
+            else:
+                VIZ.params.k_manual_rot = VIZ.params.k_manual_rot + (VIZ.params.k_manual_rot_curr,)
         else:
             MAPPING_click[dial][1](VIZ.params)
 
     print_table(VIZ)
     print(message)
+    print(f"K Man Rot {VIZ.params.k_manual_rot}")
     print(extra_message)
 
 
@@ -101,7 +116,8 @@ def VIZfind(name):
         return "Save"
     elif name == "Preset_load":
         return "Load"
-
+    elif name == "k_manual_rot":
+        return VIZ.params.k_manual_rot_curr
     else:
         return VIZ.params.__dict__[name]
 

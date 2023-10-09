@@ -23,7 +23,7 @@ MAPPING_turn = {
     5: ("k_n_segments", 12, 110, "Segments"),
     6: ("k_flip", 17, 100, "Flip"),
     7: ("increments", "*6+1", 70, "increments"),
-    8: ("", "", 120, ""),
+    8: ("k_manual_rot_curr", "k_manual_rot_curr", 120, ""),
     9: ("", "", 120, ""),
     10: ("k_alternate_flip", 17, 100, "Flip 2"),
     11: ("", "", 120, ""),
@@ -42,7 +42,7 @@ MAPPING_click = {
     5: ("", "", 120),
     6: ("", "", 120),
     7: ("", "", 120),
-    8: ("", "", 120),
+    8: ("k_manual_rot", "k_manual_rot", 120),
     9: ("", "", 120),
     10: ("", "", 120),
     11: ("", "", 120),
@@ -52,6 +52,13 @@ MAPPING_click = {
     15: ("Preset_load", "load", 60)
 }
 
+
+def k_rot_map(value):
+    #value = int(value/2)
+    if value < 37:
+        return (value * 10, True)
+    else:
+        return ((value - 37) * 10, False)
 
 
 @dataclass(unsafe_hash=True)
@@ -74,6 +81,8 @@ class Parameters:
     k_n_segments: int = 0
     k_flip: int = 1
     k_alternate_flip: int = 1
+    k_manual_rot_curr: tuple = ()
+    k_manual_rot: tuple = ((120, True), (240, True), (360, True))
 
     winw: int = 600
     winh: int = 600
@@ -82,7 +91,7 @@ class Parameters:
 
     need_update: bool = False
     update_state: bool = False
-    
+
     current_preset_num: int = 0
 
     def __setattr__(self, name, value):
@@ -175,12 +184,13 @@ class Vizard():
 
     def update_params(self):
         if self.params.need_update:
+            # Basics
             self._w = self.params.w
             self._h = self.params.h
             self._winh = self.params.winh
             self._winw = self.params.winw
             self._numpix = self._w * self._h
-
+            # Signal Generators
             self.rchannel.numpix = self._numpix
             self.gchannel.numpix = self._numpix
             self.bchannel.numpix = self._numpix
@@ -192,16 +202,31 @@ class Vizard():
             self.rchannel.waveform_ix = self.params.r_waveform_ix #% len(self.waveforms)
             self.gchannel.waveform_ix = self.params.g_waveform_ix #% len(self.waveforms)
             self.bchannel.waveform_ix = self.params.b_waveform_ix #% len(self.waveforms)
-
+            # Kaleidoscopes
             self.k_ix = self.params.kaleidoscope_ix
-            for i in range(1, len(self.kaleidoscopes)):
-                self.kaleidoscopes[i].flipped = self.params.k_flip
-                self.kaleidoscopes[i].size = self.params.w
-                self.kaleidoscopes[i].n_segments = self.params.k_n_segments
-                self.kaleidoscopes[i].alternate_flip = self.params.k_alternate_flip
 
+            self.kaleidoscopes[1].flipped = self.params.k_flip
+            self.kaleidoscopes[1].full_size = self.params.w
+            self.kaleidoscopes[1].n_segments = self.params.k_n_segments
+            self.kaleidoscopes[1].alternate_flip = self.params.k_alternate_flip
+
+            self.kaleidoscopes[2].flipped = self.params.k_flip
+            self.kaleidoscopes[2].size = self.params.w
+            self.kaleidoscopes[2].n_segments = self.params.k_n_segments
+            self.kaleidoscopes[2].alternate_flip = self.params.k_alternate_flip
+
+            self.kaleidoscopes[3].flipped = self.params.k_flip
+            self.kaleidoscopes[3].size = self.params.w
+            if len(self.params.k_manual_rot) != len(self.kaleidoscopes[3].rotations):
+                if not len(self.params.k_manual_rot) == 0:
+                    self.kaleidoscopes[3].rotations = [i[0] for i in self.params.k_manual_rot]
+                    self.kaleidoscopes[3].rotations_dir = [i[1] for i in self.params.k_manual_rot]
+                else:
+                    self.kaleidoscopes[3].rotations = []
+                    self.kaleidoscopes[3].rotations_dir = []
             if self.win_canvas.shape != (self.params.winh, self.params.winw, 3):
                 self.win_canvas = np.zeros((self.params.winh, self.params.winw, 3), dtype=np.float32)
+
 
             if self.params.update_state:
                 self.rchannel.state = self.params.r_state
