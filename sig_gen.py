@@ -21,10 +21,12 @@ def square_wave(t):
     # already 0 or 1
     return px
 
+
 def noise(t):
     px = np.random.rand(len(t))
     # 0 to 1
     return px
+
 
 def constant(t):
     freq = t[-1] - t[0]
@@ -32,6 +34,7 @@ def constant(t):
     px = np.ones(len(t), dtype=np.float32) * col
     # 0 to 1
     return px
+
 
 def triangle(t):
     px = sawtooth(t, 0.5)
@@ -51,7 +54,8 @@ class SignalGenerator():
         self._freq = freq
         self.state = 0
         self.id = id
-        self.ref_t = np.linspace(0, (self.freq * (2 * np.pi)), num=self.numpix, dtype=np.float32)
+        self.ref_t = np.linspace(0, (self.freq * (2 * np.pi)),
+                                 num=self.numpix, dtype=np.float32)
 
     @property
     def waveform_ix(self):
@@ -69,8 +73,10 @@ class SignalGenerator():
     @freq.setter
     def freq(self, freq):
         self._freq = int(freq)
-        self.ref_t = np.linspace(0, (self.freq * (2 * np.pi)), num=self.numpix, dtype=np.float32)
-        # TODO: you could also precompute the Wavefunction by making one thats double as long and then just
+        self.ref_t = np.linspace(0, (self.freq * (2 * np.pi)),
+                                 num=self.numpix, dtype=np.float32)
+        # TODO: you could also precompute the Wavefunction by making one thats
+        # double as long and then just
         # indexing into the section you need
 
     @property
@@ -80,8 +86,10 @@ class SignalGenerator():
     @numpix.setter
     def numpix(self, numpix):
         self._numpix = int(numpix)
-        self.ref_t = np.linspace(0, (self.freq * (2 * np.pi)), num=self.numpix, dtype=np.float32)
-        # TODO: you could also precompute the Wavefunction by making one thats double as long and then just
+        self.ref_t = np.linspace(0, (self.freq * (2 * np.pi)), num=self.numpix,
+                                 dtype=np.float32)
+        # TODO: you could also precompute the Wavefunction by making one thats
+        # double as long and then just
         # indexing into the section you need
 
 
@@ -92,6 +100,5 @@ class SignalGenerator():
         return px
 
     def print_freq(self):
-        print(self.id, " frequency: " , self.freq)
-
+        print(self.id, " frequency: ", self.freq)
 

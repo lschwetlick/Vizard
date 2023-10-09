@@ -1,31 +1,29 @@
 from OpenGL import GLUT
 from OpenGL import GL
-from OpenGL import GLU
+# from OpenGL import GLU
 
-from dataclasses import dataclass
 import time
-import sys
+# import sys
 import os
-import numpy as np
+# import numpy as np
 
 import mido
 
-import sig_gen as sg
-import kaleidoscope as kal
-from viz_manager import Parameters, Vizard, MAPPING_turn, MAPPING_click, k_rot_map
-import vizterm
+from viz_manager import Vizard, MAPPING_turn, MAPPING_click, k_rot_map
 import prettytable
 
 
 VIZ = Vizard()
 
 t1 = time.time()
-updatespeed = 66 # in ms
+updatespeed = 66  # in ms
 last8click = 0
+
 
 def computePixels():
     global updatespeed, VIZ
-    # we copy the correct parameters to the generation classes BETWEEN calculations
+    # we copy the correct parameters to the generation classes BETWEEN
+    # calculations
     VIZ.update_params()
     # we need to know how long the flips are taking
     n_scanned_px = updatespeed * VIZ.params.px_scan_speed
@@ -42,11 +40,12 @@ def draw():
     global t1, updatespeed, VIZ
     GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
     pix = computePixels()
-    #assert pix.shape == (WINH, WINW, 3)
-    GL.glDrawPixels(VIZ._winw, VIZ._winh, GL.GL_RGB, GL.GL_FLOAT, pix.reshape(-1).data)
+    # assert pix.shape == (WINH, WINW, 3)
+    GL.glDrawPixels(VIZ._winw, VIZ._winh, GL.GL_RGB, GL.GL_FLOAT,
+                    pix.reshape(-1).data)
     GL.glFlush()
 
-    ##print(f"flip took {(time.time() - t1)}")
+    # print(f"flip took {(time.time() - t1)}")
     updatespeed = int(((time.time() - t1)) * 1000)
     t1 = time.time()
 
@@ -80,25 +79,29 @@ def handle_midi(message):
         extra_message = f"regclick,, {VIZ.params.current_preset_num}"
         name = MAPPING_click[dial][0]
         if type(MAPPING_click[dial][1]) == int:
-            value = (VIZ.params.__dict__[name] + MAPPING_click[dial][1]) % len(VIZ.waveforms)
+            value = (VIZ.params.__dict__[name]
+                     + MAPPING_click[dial][1]) % len(VIZ.waveforms)
             VIZ.params.__setattr__(name, value)
         elif MAPPING_click[dial][1] == "load":
-            #extra_message = "got load"
-            extra_message = VIZ.load_params_from_preset(VIZ.params.current_preset_num)
+            extra_message = \
+                VIZ.load_params_from_preset(VIZ.params.current_preset_num)
             send_dataclass_to_midi(OUTPORT, VIZ.params)
         elif MAPPING_click[dial][1] == "save":
-            extra_message = VIZ.add_params_as_preset(VIZ.params.current_preset_num)
+            extra_message = \
+                VIZ.add_params_as_preset(VIZ.params.current_preset_num)
         elif MAPPING_click[dial][1] == "k_manual_rot":
             now = time.time()
             extra_message = f"hello {now - last8click}"
             if ((now - last8click) > 2) & ((now - last8click) < 10):
                 VIZ.params.k_manual_rot = ()
             else:
-                VIZ.params.k_manual_rot = VIZ.params.k_manual_rot + (VIZ.params.k_manual_rot_curr,)
+                VIZ.params.k_manual_rot = \
+                    VIZ.params.k_manual_rot + (VIZ.params.k_manual_rot_curr,)
         else:
             MAPPING_click[dial][1](VIZ.params)
 
-    print_table(VIZ)
+    if VIZ.interface_mode:
+        print_table(VIZ)
     print(message)
     print(f"K Man Rot {VIZ.params.k_manual_rot}")
     print(extra_message)
@@ -123,12 +126,12 @@ def VIZfind(name):
 
 
 def print_table(VIZ):
-    #Color
-    R = "\033[0;31;40m" #RED
-    G = "\033[0;32;40m" # GREEN
-    Y = "\033[0;33;40m" # Yellow
-    B = "\033[0;34;40m" # Blue
-    N = "\033[0m" # Reset  
+    # Color
+    R = "\033[0;31;40m"  # RED
+    # G = "\033[0;32;40m"  # GREEN
+    # Y = "\033[0;33;40m"  # Yellow
+    # B = "\033[0;34;40m"  # Blue
+    N = "\033[0m"  # Reset
     tab = prettytable.PrettyTable()
     tab.hrules = 1
     tab.header = False
@@ -146,23 +149,9 @@ def print_table(VIZ):
         for j in range(4):
             r.append(VIZfind(MAPPING_click[(i * 4) + j][0]))
         tab.add_row(r)
-    os.system('clear')
-    print(tab)
-
-
-def on_motion(x, y):
-    global delta_r, delta_b, px_scan_speed
-    max_x = 600
-    max_delta_r = 3000
-    steps = max_delta_r / max_x
-    delta_r = steps * x
-    #delta_b = steps * y
-    
-    max_px_scan_speed = 3600
-    steps = max_px_scan_speed / max_x
-    px_scan_speed = steps * y
-    
-
+    if VIZ.interface_mode:
+        os.system('clear')
+        print(tab)
 
 
 def reshape_me(newWidth, newHeight):
@@ -191,11 +180,13 @@ def send_dataclass_to_midi(outport, params):
             elif MAPPING_turn[chan][1] == "preset":
                 val = int(params.__dict__[name])
             # send value
-            msg = mido.Message('control_change', channel=0, control=chan, value=val, time=0)
+            msg = mido.Message('control_change', channel=0, control=chan,
+                               value=val, time=0)
             outport.send(msg)
         # send col
         col = MAPPING_turn[chan][2]
-        msg = mido.Message('control_change', channel=1, control=chan, value=col, time=0)
+        msg = mido.Message('control_change', channel=1, control=chan,
+                           value=col, time=0)
         outport.send(msg)
 
 # print(VIZ.presets["0"])
@@ -214,15 +205,21 @@ send_dataclass_to_midi(OUTPORT, VIZ.params)
 print_table(VIZ)
 port.callback = handle_midi
 
-GLUT.glutInit()  # Initialize a glut instance which will allow us to customize our window
-GLUT.glutInitDisplayMode(GLUT.GLUT_RGB)  # Set the display mode to be colored
-GLUT.glutInitWindowSize(VIZ.params.winw, VIZ.params.winh)   # Set the width and height of your window
-GLUT.glutInitWindowPosition(0, 0)   # Set the position at which this windows should appear
-wind = GLUT.glutCreateWindow("It's the Vizard")  # Give your window a title
+# Initialize a glut instance which will allow us to customize our window
+GLUT.glutInit()
+# Set the display mode to be colored
+GLUT.glutInitDisplayMode(GLUT.GLUT_RGB)
+# Set the width and height of your window
+GLUT.glutInitWindowSize(VIZ.params.winw, VIZ.params.winh)
+# Set the position at which this windows should appear
+GLUT.glutInitWindowPosition(0, 0)
+# Give your window a title
+wind = GLUT.glutCreateWindow("It's the Vizard")
 GLUT.glutReshapeFunc(reshape_me)
-#GLUT.glutMouseFunc(mouseFunc)
-#GLUT.glutPassiveMotionFunc(on_motion)
-#GLUT.glutKeyboardFunc(on_key)
-GLUT.glutDisplayFunc(draw)  # Tell OpenGL to call the showScreen method continuously
-#GLUT.glutIdleFunc(showScreen)     # Draw any graphics or shapes in the showScreen function at all times
-GLUT.glutMainLoop()  # Keeps the window created above displaying/running in a loop
+# GLUT.glutMouseFunc(mouseFunc)
+# GLUT.glutPassiveMotionFunc(on_motion)
+# GLUT.glutKeyboardFunc(on_key)
+# Tell OpenGL to call the showScreen method continuously
+GLUT.glutDisplayFunc(draw)
+# Keeps the window created above displaying/running in a loop
+GLUT.glutMainLoop()

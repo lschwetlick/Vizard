@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class Kaleidoscope():
     def __init__(self, flipped, size):
         self._flipped = flipped
@@ -50,7 +51,6 @@ class Kaleidoscope():
         return fmask
 
     def kaleidobase(self, img, fmask):
-        #assert img.shape == (self.size, self.size, 3)
         img_t = np.rot90(img)
         comp = np.where(fmask, img, img_t)
         top = np.hstack((comp, comp[:, ::-1, :]))
@@ -62,7 +62,7 @@ class Recurseoscope(Kaleidoscope):
     def __init__(self, flipped, size, n_segments):
         super(Recurseoscope, self).__init__(flipped, size)
         self.n_segments = n_segments
-        self._size = size / 2
+        self.size = size / 2
 
     @property
     def size(self):
@@ -70,13 +70,13 @@ class Recurseoscope(Kaleidoscope):
 
     @size.setter
     def size(self, size):
-        if (size / 2) != self._size:
+        if self._size != (size / 2):
             self._size = size / 2
             self.fmask = self.get_mask(self.flipped)
 
     def kaleide(self, img):
-        #print(self.size)
-        #assert img.shape == (self.size, self.size, 3)
+        # print(self.size)
+        # assert img.shape == (self.size, self.size, 3)
         for _ in range(self.n_segments):
             img = img[::2, ::2, :]
             img = self.kaleidobase(img, self.fmask)
@@ -86,15 +86,14 @@ class Recurseoscope(Kaleidoscope):
 class Multiscope(Kaleidoscope):
 
     def __init__(self, flipped, size, n_segments, alternate_flip=2):
-        self._full_size = size # full size is the size of the canvas
+        self._full_size = size  # full size is the size of the canvas
         super(Multiscope, self).__init__(flipped, size)
         self._alternate_flip = None
         self.alternate_flip = alternate_flip
-        #self.fmask2 = self.get_mask(alternate_flip)
         self.quick = True
         self.segments = None
         self._n_segments = None
-        self.seg_size = None # seg_size is the size of each segment
+        self.seg_size = None  # seg_size is the size of each segment
         self.n_segments = n_segments
 
 
@@ -132,7 +131,7 @@ class Multiscope(Kaleidoscope):
             self._n_segments = n_segments
             self.set_segments()
 
-                
+
 
 
     def set_segments(self):
@@ -168,7 +167,6 @@ class Multiscope(Kaleidoscope):
 
 
     def kaleide(self, img):
-        #print(segm, self.quick, self.seg_size, self.size, self.full_size, self.n_segments)
         if self.n_segments == 0:
             return img
         cnt = 0
@@ -184,7 +182,8 @@ class Multiscope(Kaleidoscope):
                         (self.segments)[j - 1]:(self.segments)[j], :] = \
                         self.kaleidobase(
                             img[(self.segments)[i - 1]:(self.segments)[i]:2,
-                                (self.segments)[j - 1]:(self.segments)[j]:2, :],
+                                (self.segments)[j - 1]:(self.segments)[j]:2,
+                                :],
                             fmask=thisflip)
                 else:
                     img[(self.segments)[i - 1]:(self.segments)[i],
@@ -195,12 +194,6 @@ class Multiscope(Kaleidoscope):
                             fmask=thisflip)[::2, ::2, :]
                 cnt += 1
         return img
-
-
-# make one knob me the number of channels that are flipped
-# make a different knob be how much of the image is being kaleidoscoped
-# make another knob be wether its one flipped one normal or all flipped and mirrored
-
 
 
 class KaleidoscopeMultiMirror():
@@ -256,17 +249,15 @@ class KaleidoscopeMultiMirror():
         ii, jj = abs(np.mgrid[0:self.size, 0:self.size])
         self.masks = []
         self.pixel_mappings = []
-        #if len(self.rotations) == 0:
-         #   self.pixel_mappings.append((new_ix_i, new_ix_j))
-        
+
         for i, r in enumerate(self.rotations):
             a, b = get_params(r, int(self.size / 2), int(self.size / 2))
             d = get_dist_to_line(a, b, ii, jj)
             puv = get_perp_uv(a)
             i_mv_px_by, j_mv_px_by = get_reflection_delta(d, puv)
-            # TODO: clip??
-            # new_ix_i = np.clip(ii - i_mv_px_by - 1, -self.size, self.size - 1)
-            # new_ix_j = np.clip(jj - j_mv_px_by - 1, -self.size, self.size - 1)
+            # TDO: clip??
+            # new_ix_i = np.clip(ii - i_mv_px_by - 1, -self.size, self.size- 1)
+            # new_ix_j = np.clip(jj - j_mv_px_by - 1, -self.size, self.size- 1)
             new_ix_i = np.clip(ii - i_mv_px_by - 1, 0, self.size - 1)
             new_ix_j = np.clip(jj - j_mv_px_by - 1, 0, self.size - 1)
 
@@ -365,21 +356,23 @@ def get_dist_to_line(pa, pb, i, j):
     p = np.stack((j, i), axis=2)
     a = np.array([0, pb])
     b = np.array([1, pa])
-    top = np.cross((p-a), b, axisa=2, axisb=0)
+    top = np.cross((p - a), b, axisa=2, axisb=0)
     bottom = np.linalg.norm(b)
-    return top/bottom
+    return top / bottom
+
 
 def get_perp_uv(a):
     """
     finds the unit vector that is perpendicular to a line with rise parameter a
     """
-    uv = np.array([1,a])
+    uv = np.array([1, a])
     uv_len = np.sqrt(np.sum(uv**2))
-    uv = uv/uv_len
+    uv = uv / uv_len
     puv = np.array([a, -1])
     puv_len = np.sqrt(np.sum(puv**2))
-    puv = puv/puv_len
+    puv = puv / puv_len
     return puv
+
 
 def get_reflection_delta(other, puv):
     """

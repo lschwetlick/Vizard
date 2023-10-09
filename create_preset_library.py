@@ -8,4 +8,4 @@ for i in range(127):
     presets[i] = Parameters().to_dict()
 
 with open(PRESETFILE, 'w') as f:
-    json.dump( presets, f)
+    json.dump(presets, f)

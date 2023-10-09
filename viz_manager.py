@@ -54,7 +54,7 @@ MAPPING_click = {
 
 
 def k_rot_map(value):
-    #value = int(value/2)
+    # value = int(value/2)
     if value < 37:
         return (value * 10, True)
     else:
@@ -112,6 +112,8 @@ class Parameters:
 
 class Vizard():
     def __init__(self):
+        self.interface_mode = False
+        
         self.params = Parameters()
         self._w = self.params.w
         self._h = self.params.h
@@ -199,9 +201,9 @@ class Vizard():
             self.gchannel.freq = self.params.g_freq
             self.bchannel.freq = self.params.b_freq
 
-            self.rchannel.waveform_ix = self.params.r_waveform_ix #% len(self.waveforms)
-            self.gchannel.waveform_ix = self.params.g_waveform_ix #% len(self.waveforms)
-            self.bchannel.waveform_ix = self.params.b_waveform_ix #% len(self.waveforms)
+            self.rchannel.waveform_ix = self.params.r_waveform_ix
+            self.gchannel.waveform_ix = self.params.g_waveform_ix
+            self.bchannel.waveform_ix = self.params.b_waveform_ix
             # Kaleidoscopes
             self.k_ix = self.params.kaleidoscope_ix
 
@@ -217,15 +219,21 @@ class Vizard():
 
             self.kaleidoscopes[3].flipped = self.params.k_flip
             self.kaleidoscopes[3].size = self.params.w
-            if len(self.params.k_manual_rot) != len(self.kaleidoscopes[3].rotations):
+            if len(self.params.k_manual_rot) \
+                    != len(self.kaleidoscopes[3].rotations):
                 if not len(self.params.k_manual_rot) == 0:
-                    self.kaleidoscopes[3].rotations = [i[0] for i in self.params.k_manual_rot]
-                    self.kaleidoscopes[3].rotations_dir = [i[1] for i in self.params.k_manual_rot]
+                    self.kaleidoscopes[3].rotations = \
+                        [i[0] for i in self.params.k_manual_rot]
+                    self.kaleidoscopes[3].rotations_dir = \
+                        [i[1] for i in self.params.k_manual_rot]
                 else:
                     self.kaleidoscopes[3].rotations = []
                     self.kaleidoscopes[3].rotations_dir = []
-            if self.win_canvas.shape != (self.params.winh, self.params.winw, 3):
-                self.win_canvas = np.zeros((self.params.winh, self.params.winw, 3), dtype=np.float32)
+            if self.win_canvas.shape != (self.params.winh,
+                                         self.params.winw, 3):
+                self.win_canvas = \
+                    np.zeros((self.params.winh, self.params.winw, 3),
+                             dtype=np.float32)
 
 
             if self.params.update_state:
@@ -257,18 +265,20 @@ class Vizard():
         top = int(leftover_h / 2)
         bottom = leftover_h - top
 
-        # print(leftover_w, leftover_h, left, top, w, h, winw, winh, (left + w))
-        # win_canvas = np.zeros((winh, winw, 3), dtype=np.float32)
-        self.win_canvas[top:(top + self._h), left:(left + self._w), :] = rgb
-
-        # if False:
-        #     if left > 1:
-        #         #print(rgb[:, 0:left, :].shape)
-        #         #print(rgb[:, 0:left:-1, :].shape)
-        #         win_canvas[:, 0:left, :] = rgb[:, 0:left, :][:,::-1,:]
-        #         win_canvas[:, (winw - right):winw, :] = rgb[:, (w - right):w, :][:,::-1,:]
-        #     if top > 1:
-        #         win_canvas[0:top, :, :] = rgb[0:top, :, :][::-1,:,:]
-        #         win_canvas[(winh - bottom):winh, :, :] = rgb[(h - bottom):h, :, :][::-1,:,:]
+        reflect = False
+        if not reflect:
+            self.win_canvas[top:(top + self._h),
+                            left:(left + self._w), :] = rgb
+        else:
+            if left > 1:
+                # print(rgb[:, 0:left, :].shape)
+                # print(rgb[:, 0:left:-1, :].shape)
+                self.win_canvas[:, 0:left, :] = rgb[:, 0:left, :][:, ::-1, :]
+                self.win_canvas[:, (self.winw - right):self.winw, :] = \
+                    rgb[:, (self.w - right):self.w, :][:, ::-1, :]
+            if top > 1:
+                self.win_canvas[0:top, :, :] = rgb[0:top, :, :][::-1, :, :]
+                self.win_canvas[(self.winh - bottom):self.winh, :, :] = \
+                    rgb[(self.h - bottom):self.h, :, :][::-1, :, :]
         return self.win_canvas
 
