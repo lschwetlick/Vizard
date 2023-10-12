@@ -54,8 +54,10 @@ def draw():
 
 def handle_midi(message):
     global VIZ, a1, OUTPORT, last8click
+
     dial = message.control
     value = message.value
+    keyboard.PSEUDOKNOBS[dial].value = value
     extra_message = "Extra"
     if message.channel == 0:
         name = MAPPING_turn[dial][0]
@@ -72,6 +74,7 @@ def handle_midi(message):
             name = "k_manual_rot_curr"
 
         VIZ.params.__setattr__(name, value)
+        
 
     elif (message.channel == 1) and (message.value == 127):
         if MAPPING_click[dial][1] == "k_manual_rot":
@@ -169,7 +172,7 @@ def reshape_me(newWidth, newHeight):
     return None
 
 
-def send_dataclass_to_midi(outport, params):
+def send_dataclass_to_midi(outport, params, PSEUDOKNOBS):
     for chan in MAPPING_turn.keys():
         name = MAPPING_turn[chan][0]
         if name != "":
@@ -181,15 +184,19 @@ def send_dataclass_to_midi(outport, params):
                 val = int((params.__dict__[name] / 6) - 1)
             elif MAPPING_turn[chan][1] == "preset":
                 val = int(params.__dict__[name])
-            # send value
-            msg = mido.Message('control_change', channel=0, control=chan,
-                               value=val, time=0)
+            if outport != "kb_only":
+                # send value
+                msg = mido.Message('control_change', channel=0, control=chan,
+                                   value=val, time=0)
+                outport.send(msg)
+            PSEUDOKNOBS[chan].value = val
+        if outport != "kb_only":
+            # send col
+            col = MAPPING_turn[chan][2]
+            msg = mido.Message('control_change', channel=1, control=chan,
+                               value=col, time=0)
             outport.send(msg)
-        # send col
-        col = MAPPING_turn[chan][2]
-        msg = mido.Message('control_change', channel=1, control=chan,
-                           value=col, time=0)
-        outport.send(msg)
+
 
 # print(VIZ.presets["0"])
 # print(Parameters().to_dict())
@@ -198,10 +205,11 @@ def send_dataclass_to_midi(outport, params):
 
 
 def on_key(key, x, y):
-    if key in keyboard.keysmap.keys():
-        keyboard.keysmap[key][1]()
-        msg = keyboard.keysmap[key][0]()
+    if key in keyboard.KEYSMAP.keys():
+        keyboard.KEYSMAP[key][1]()
+        msg = keyboard.KEYSMAP[key][0]()
         handle_midi(msg)
+        send_dataclass_to_midi(OUTPORT, VIZ.params, keyboard.PSEUDOKNOBS)
 
 
 try:
@@ -209,11 +217,12 @@ try:
     OUTPORT = mido.open_output('Midi Fighter Twister')
 
     print(VIZ.params)
-    send_dataclass_to_midi(OUTPORT, VIZ.params)
     port.callback = handle_midi
 except OSError:
     print("MIDI not available. Use Keyboard!")
+    OUTPORT = "kb_only"
 
+send_dataclass_to_midi(OUTPORT, VIZ.params, keyboard.PSEUDOKNOBS)
 
 print_table(VIZ)
 

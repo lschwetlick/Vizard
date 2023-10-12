@@ -23,61 +23,63 @@ class pseudomidiknob:
 
     def click_out(self):
         return pseudomidiknob(control=self.control, value=0, channel=1)
-    
+
     def nothing(self):
         pass
 
 
-kn0 = pseudomidiknob(control=0)
-kn1 = pseudomidiknob(control=1)
-kn2 = pseudomidiknob(control=2)
-kn3 = pseudomidiknob(control=3)
-kn4 = pseudomidiknob(control=4)
-kn5 = pseudomidiknob(control=5)
-kn6 = pseudomidiknob(control=6)
-kn7 = pseudomidiknob(control=7)
-kn8 = pseudomidiknob(control=8)
-kn9 = pseudomidiknob(control=9)
-kn10 = pseudomidiknob(control=10)
-kn11 = pseudomidiknob(control=11)
-kn12 = pseudomidiknob(control=12)
-kn13 = pseudomidiknob(control=13)
-kn14 = pseudomidiknob(control=14)
-kn15 = pseudomidiknob(control=15)
+PSEUDOKNOBS = {
+    0: pseudomidiknob(control=0),
+    1: pseudomidiknob(control=1),
+    2: pseudomidiknob(control=2),
+    3: pseudomidiknob(control=3),
+    4: pseudomidiknob(control=4),
+    5: pseudomidiknob(control=5),
+    6: pseudomidiknob(control=6),
+    7: pseudomidiknob(control=7),
+    8: pseudomidiknob(control=8),
+    9: pseudomidiknob(control=9),
+    10: pseudomidiknob(control=10),
+    11: pseudomidiknob(control=11),
+    12: pseudomidiknob(control=12),
+    13: pseudomidiknob(control=13),
+    14: pseudomidiknob(control=14),
+    15: pseudomidiknob(control=15),
+}
 
 
-keysmap = {
-    b"q": (kn0.turn, kn0.increment),
-    b"Q": (kn0.turn, kn0.decrement),
-    b"1": (kn0.click_out, kn0.nothing),
-    b"w": (kn1.turn, kn1.increment),
-    b"W": (kn1.turn, kn1.decrement),
-    b"2": (kn1.click_out, kn1.nothing),
-    b"e": (kn2.turn, kn2.increment),
-    b"E": (kn2.turn, kn2.decrement),
-    b"3": (kn2.click_out, kn2.nothing),
-    b"r": (kn3.turn, kn3.increment),
-    b"R": (kn3.turn, kn3.decrement),
-    b"4": (kn3.click_out, kn3.nothing),
+KEYSMAP = {
+    b"q": (PSEUDOKNOBS[0].turn, PSEUDOKNOBS[0].increment),
+    b"Q": (PSEUDOKNOBS[0].turn, PSEUDOKNOBS[0].decrement),
+    b"1": (PSEUDOKNOBS[0].click_out, PSEUDOKNOBS[0].nothing),
+    b"w": (PSEUDOKNOBS[1].turn, PSEUDOKNOBS[1].increment),
+    b"W": (PSEUDOKNOBS[1].turn, PSEUDOKNOBS[1].decrement),
+    b"2": (PSEUDOKNOBS[1].click_out, PSEUDOKNOBS[1].nothing),
+    b"e": (PSEUDOKNOBS[2].turn, PSEUDOKNOBS[2].increment),
+    b"E": (PSEUDOKNOBS[2].turn, PSEUDOKNOBS[2].decrement),
+    b"3": (PSEUDOKNOBS[2].click_out, PSEUDOKNOBS[2].nothing),
+    b"r": (PSEUDOKNOBS[3].turn, PSEUDOKNOBS[3].increment),
+    b"R": (PSEUDOKNOBS[3].turn, PSEUDOKNOBS[3].decrement),
+    b"4": (PSEUDOKNOBS[3].click_out, PSEUDOKNOBS[3].nothing),
 
-    b"a": (kn4.click_out, kn4.nothing),
-    b"s": (kn5.turn, kn5.increment),
-    b"S": (kn5.turn, kn5.decrement),
-    b"d": (kn6.turn, kn6.increment),
-    b"D": (kn6.turn, kn6.decrement),
-    b"f": (kn7.turn, kn7.increment),
-    b"F": (kn7.turn, kn7.decrement),
+    b"a": (PSEUDOKNOBS[4].click_out, PSEUDOKNOBS[4].nothing),
+    b"s": (PSEUDOKNOBS[5].turn, PSEUDOKNOBS[5].increment),
+    b"S": (PSEUDOKNOBS[5].turn, PSEUDOKNOBS[5].decrement),
+    b"d": (PSEUDOKNOBS[6].turn, PSEUDOKNOBS[6].increment),
+    b"D": (PSEUDOKNOBS[6].turn, PSEUDOKNOBS[6].decrement),
+    b"f": (PSEUDOKNOBS[7].turn, PSEUDOKNOBS[7].increment),
+    b"F": (PSEUDOKNOBS[7].turn, PSEUDOKNOBS[7].decrement),
 
-    b"<": (kn8.turn, kn8.increment),
-    b">": (kn8.turn, kn8.decrement),
-    b"y": (kn8.click_in, kn8.nothing),
-    b"Y": (kn8.click_out, kn8.nothing),
-    b"x": (kn10.turn, kn10.increment),
-    b"X": (kn10.turn, kn10.decrement),
+    b"<": (PSEUDOKNOBS[8].turn, PSEUDOKNOBS[8].increment),
+    b">": (PSEUDOKNOBS[8].turn, PSEUDOKNOBS[8].decrement),
+    b"y": (PSEUDOKNOBS[8].click_in, PSEUDOKNOBS[8].nothing),
+    b"Y": (PSEUDOKNOBS[8].click_out, PSEUDOKNOBS[8].nothing),
+    b"x": (PSEUDOKNOBS[10].turn, PSEUDOKNOBS[10].increment),
+    b"X": (PSEUDOKNOBS[10].turn, PSEUDOKNOBS[10].decrement),
 
-    b"m": (kn15.turn, kn15.increment),
-    b"M": (kn15.turn, kn15.decrement),
-    b";": (kn15.click_in, kn15.nothing),
-    b"n": (kn14.click_in, kn14.nothing),
+    b"m": (PSEUDOKNOBS[15].turn, PSEUDOKNOBS[15].increment),
+    b"M": (PSEUDOKNOBS[15].turn, PSEUDOKNOBS[15].decrement),
+    b";": (PSEUDOKNOBS[15].click_in, PSEUDOKNOBS[15].nothing),
+    b"n": (PSEUDOKNOBS[14].click_in, PSEUDOKNOBS[14].nothing),
 
 }
