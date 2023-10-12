@@ -112,7 +112,7 @@ class Parameters:
 
 class Vizard():
     def __init__(self):
-        self.interface_mode = False
+        self.interface_mode = True
         
         self.params = Parameters()
         self._w = self.params.w

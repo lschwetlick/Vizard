@@ -12,6 +12,8 @@ import mido
 from viz_manager import Vizard, MAPPING_turn, MAPPING_click, k_rot_map
 import prettytable
 
+import keyboard
+
 
 VIZ = Vizard()
 
@@ -195,15 +197,26 @@ def send_dataclass_to_midi(outport, params):
 # print(aa)
 
 
-port = mido.open_input(callback=handle_midi)
-OUTPORT = mido.open_output()
+def on_key(key, x, y):
+    if key in keyboard.keysmap.keys():
+        keyboard.keysmap[key][1]()
+        msg = keyboard.keysmap[key][0]()
+        handle_midi(msg)
 
-print(VIZ.params)
-send_dataclass_to_midi(OUTPORT, VIZ.params)
+
+try:
+    port = mido.open_input('Midi Fighter Twister', callback=handle_midi)
+    OUTPORT = mido.open_output('Midi Fighter Twister')
+
+    print(VIZ.params)
+    send_dataclass_to_midi(OUTPORT, VIZ.params)
+    port.callback = handle_midi
+except OSError:
+    print("MIDI not available. Use Keyboard!")
 
 
 print_table(VIZ)
-port.callback = handle_midi
+
 
 # Initialize a glut instance which will allow us to customize our window
 GLUT.glutInit()
@@ -218,7 +231,7 @@ wind = GLUT.glutCreateWindow("It's the Vizard")
 GLUT.glutReshapeFunc(reshape_me)
 # GLUT.glutMouseFunc(mouseFunc)
 # GLUT.glutPassiveMotionFunc(on_motion)
-# GLUT.glutKeyboardFunc(on_key)
+GLUT.glutKeyboardFunc(on_key)
 # Tell OpenGL to call the showScreen method continuously
 GLUT.glutDisplayFunc(draw)
 # Keeps the window created above displaying/running in a loop
