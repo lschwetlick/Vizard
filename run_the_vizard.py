@@ -14,18 +14,18 @@ import keyboard
 
 VIZ = Vizard()
 
-t1 = time.time()
-updatespeed = 66  # in ms
-last8click = 0
+T1 = time.time()
+UPDATESPEED = 66  # in ms
+LAST8CLICK = 0
 
 
 def computePixels():
-    global updatespeed, VIZ
+    global UPDATESPEED, VIZ
     # we copy the correct parameters to the generation classes BETWEEN
     # calculations
     VIZ.update_params()
     # we need to know how long the flips are taking
-    n_scanned_px = updatespeed * VIZ.params.px_scan_speed
+    n_scanned_px = UPDATESPEED * VIZ.params.px_scan_speed
     # get the signal
     rgb = VIZ.get_RGB(n_scanned_px)
     rgb = VIZ.apply_kaleidoscope(rgb)
@@ -36,7 +36,7 @@ def computePixels():
 
 
 def draw():
-    global t1, updatespeed, VIZ
+    global T1, UPDATESPEED, VIZ
     GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
     pix = computePixels()
     # assert pix.shape == (WINH, WINW, 3)
@@ -44,13 +44,13 @@ def draw():
                     pix.reshape(-1).data)
     GL.glFlush()
 
-    # print(f"flip took {(time.time() - t1)}")
-    updatespeed = int(((time.time() - t1)) * 1000)
-    t1 = time.time()
+    # print(f"flip took {(time.time() - T1)}")
+    UPDATESPEED = int(((time.time() - T1)) * 1000)
+    T1 = time.time()
 
 
 def handle_midi(message):
-    global VIZ, a1, OUTPORT, last8click
+    global VIZ, a1, OUTPORT, LAST8CLICK
 
     dial = message.control
     value = message.value
@@ -75,7 +75,7 @@ def handle_midi(message):
 
     elif (message.channel == 1) and (message.value == 127):
         if MAPPING_click[dial][1] == "k_manual_rot":
-            last8click = time.time()
+            LAST8CLICK = time.time()
 
     elif (message.channel == 1) and (message.value == 0):
         extra_message = f"regclick,, {VIZ.params.current_preset_num}"
@@ -93,8 +93,8 @@ def handle_midi(message):
                 VIZ.add_params_as_preset(VIZ.params.current_preset_num)
         elif MAPPING_click[dial][1] == "k_manual_rot":
             now = time.time()
-            extra_message = f"hello {now - last8click}"
-            if ((now - last8click) > 2) & ((now - last8click) < 10):
+            extra_message = f"hello {now - LAST8CLICK}"
+            if ((now - LAST8CLICK) > 2) & ((now - LAST8CLICK) < 10):
                 VIZ.params.k_manual_rot = ()
             else:
                 VIZ.params.k_manual_rot = \
@@ -210,11 +210,11 @@ def on_key(key, x, y):
 
 
 try:
-    port = mido.open_input('Midi Fighter Twister', callback=handle_midi)
+    INPORT = mido.open_input('Midi Fighter Twister', callback=handle_midi)
     OUTPORT = mido.open_output('Midi Fighter Twister')
 
     print(VIZ.params)
-    port.callback = handle_midi
+    INPORT.callback = handle_midi
 except OSError:
     print("MIDI not available. Use Keyboard!")
     OUTPORT = "kb_only"
