@@ -1,11 +1,8 @@
 from OpenGL import GLUT
 from OpenGL import GL
-# from OpenGL import GLU
 
 import time
-# import sys
 import os
-# import numpy as np
 
 import mido
 
