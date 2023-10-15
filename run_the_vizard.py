@@ -13,7 +13,6 @@ import keyboard
 
 
 VIZ = Vizard()
-
 T1 = time.time()
 UPDATESPEED = 66  # in ms
 LAST8CLICK = 0
@@ -25,7 +24,7 @@ def computePixels():
     # calculations
     VIZ.update_params()
     # we need to know how long the flips are taking
-    n_scanned_px = UPDATESPEED * VIZ.params.px_scan_speed
+    n_scanned_px = UPDATESPEED * VIZ.px_scan_speed
     # get the signal
     rgb = VIZ.get_RGB(n_scanned_px)
     rgb = VIZ.apply_kaleidoscope(rgb)
@@ -56,104 +55,59 @@ def handle_midi(message):
     value = message.value
     keyboard.PSEUDOKNOBS[dial].value = value
     extra_message = "Extra"
+    # turn events
     if message.channel == 0:
+        print("turn")
         name = MAPPING_turn[dial][0]
-        if MAPPING_turn[dial][1] == "inc":
-            value = int(value * VIZ.params.increments)
-        elif type(MAPPING_turn[dial][1]) == int:
-            value = int(value / MAPPING_turn[dial][1])
-        elif MAPPING_turn[dial][1] == "*6+1":
-            value = int((value * 6) + 1)
-        elif MAPPING_turn[dial][1] == "preset":
-            value = int(value)
-        elif MAPPING_turn[dial][1] == "k_manual_rot_curr":
+        if MAPPING_turn[dial][1] == "k_manual_rot_curr":
             value = k_rot_map(int(value))
             name = "k_manual_rot_curr"
-
+        print("set", name, value)
         VIZ.params.__setattr__(name, value)
-        
-
-    elif (message.channel == 1) and (message.value == 127):
+    
+    #press in events
+    if (message.channel == 1) and (message.value == 127):
+        print("press")
         if MAPPING_click[dial][1] == "k_manual_rot":
             LAST8CLICK = time.time()
 
-    elif (message.channel == 1) and (message.value == 0):
+    # release events
+    if (message.channel == 1) and (message.value == 0):
         extra_message = f"regclick,, {VIZ.params.current_preset_num}"
+        print("release", extra_message)
         name = MAPPING_click[dial][0]
-        if type(MAPPING_click[dial][1]) == int:
-            value = (VIZ.params.__dict__[name]
-                     + MAPPING_click[dial][1]) % len(VIZ.waveforms)
-            VIZ.params.__setattr__(name, value)
-        elif MAPPING_click[dial][1] == "load":
-            extra_message = \
-                VIZ.load_params_from_preset(VIZ.params.current_preset_num)
+        print(f"release {name}")
+        if name == "Preset_load":
+            thispreset = VIZ.params.current_preset_num
+            print(f" loading {thispreset}")
+            try:
+                extra_message = \
+                    VIZ.load_params_from_preset(thispreset)
+            except Exception as e:
+                print(f"Could not load Preset {thispreset}")
+                print(e)
+                raise
             send_dataclass_to_midi(OUTPORT, VIZ.params)
-        elif MAPPING_click[dial][1] == "save":
-            extra_message = \
-                VIZ.add_params_as_preset(VIZ.params.current_preset_num)
-        elif MAPPING_click[dial][1] == "k_manual_rot":
+        elif name == "Preset_save":
+            try:
+                extra_message = \
+                    VIZ.add_params_as_preset(VIZ.params.current_preset_num)
+            except:
+                print(f"Could not save Preset {thispreset}")
+                raise
+        elif name == "k_manual_rot":
             now = time.time()
-            extra_message = f"hello {now - LAST8CLICK}"
+            extra_message = f"Deleting Rotations {now - LAST8CLICK}"
             if ((now - LAST8CLICK) > 2) & ((now - LAST8CLICK) < 10):
                 VIZ.params.k_manual_rot = ()
             else:
                 VIZ.params.k_manual_rot = \
                     VIZ.params.k_manual_rot + (VIZ.params.k_manual_rot_curr,)
-        else:
+        elif name == "update_state":
             MAPPING_click[dial][1](VIZ.params)
-
-    if VIZ.interface_mode:
-        print_table(VIZ)
-    print(message)
-    print(f"K Man Rot {VIZ.params.k_manual_rot}")
-    print(extra_message)
-
-
-def VIZfind(name):
-    global VIZ
-    if name == "":
-        return ""
-    elif name == "kaleidoscope_ix":
-        return VIZ.kal_names[VIZ.params.__dict__[name]]
-    elif name[2:6] == "wave":
-        return VIZ.waveforms_names[VIZ.params.__dict__[name]]
-    elif name == "Preset_save":
-        return "Save"
-    elif name == "Preset_load":
-        return "Load"
-    elif name == "k_manual_rot":
-        return VIZ.params.k_manual_rot_curr
-    else:
-        return VIZ.params.__dict__[name]
-
-
-def print_table(VIZ):
-    # Color
-    R = "\033[0;31;40m"  # RED
-    # G = "\033[0;32;40m"  # GREEN
-    # Y = "\033[0;33;40m"  # Yellow
-    # B = "\033[0;34;40m"  # Blue
-    N = "\033[0m"  # Reset
-    tab = prettytable.PrettyTable()
-    tab.hrules = 1
-    tab.header = False
-
-    for i in range(4):
-        r = []
-        for j in range(4):
-            r.append(R + MAPPING_turn[(i * 4) + j][3] + N)
-        tab.add_row(r)
-        r = []
-        for j in range(4):
-            r.append(VIZfind(MAPPING_turn[(i * 4) + j][0]))
-        tab.add_row(r)
-        r = []
-        for j in range(4):
-            r.append(VIZfind(MAPPING_click[(i * 4) + j][0]))
-        tab.add_row(r)
-    if VIZ.interface_mode:
-        os.system('clear')
-        print(tab)
+        else:
+            val = VIZ.params.__getattribute__(name) + 1
+            VIZ.params.__setattr__(name, val)
 
 
 def reshape_me(newWidth, newHeight):
@@ -174,11 +128,13 @@ def send_dataclass_to_midi(outport, params, PSEUDOKNOBS):
         name = MAPPING_turn[chan][0]
         if name != "":
             if MAPPING_turn[chan][1] == "inc":
-                val = int(params.__dict__[name] / params.increments)
+                pass
+                #val = int(params.__dict__[name] / params.increments)
+                val = 0
             elif type(MAPPING_turn[chan][1]) == int:
                 val = params.__dict__[name] * MAPPING_turn[chan][1]
             elif MAPPING_turn[chan][1] == "*6+1":
-                val = int((params.__dict__[name] / 6) - 1)
+                val = VIZ.increments#int((params.__dict__[name] / 6) - 1)
             elif MAPPING_turn[chan][1] == "preset":
                 val = int(params.__dict__[name])
             if outport != "kb_only":
@@ -193,12 +149,6 @@ def send_dataclass_to_midi(outport, params, PSEUDOKNOBS):
             msg = mido.Message('control_change', channel=1, control=chan,
                                value=col, time=0)
             outport.send(msg)
-
-
-# print(VIZ.presets["0"])
-# print(Parameters().to_dict())
-# aa = Parameters.from_dict(Parameters().to_dict())
-# print(aa)
 
 
 def on_key(key, x, y):
@@ -220,8 +170,6 @@ except OSError:
     OUTPORT = "kb_only"
 
 send_dataclass_to_midi(OUTPORT, VIZ.params, keyboard.PSEUDOKNOBS)
-
-print_table(VIZ)
 
 
 # Initialize a glut instance which will allow us to customize our window

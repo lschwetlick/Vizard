@@ -1,8 +1,10 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import sig_gen as sg
 import kaleidoscope as kal
 import numpy as np
 import json
+import prettytable
+import os
 
 PRESETFILE = "preset_lib.json"
 
@@ -15,15 +17,15 @@ def reset_states(p):
 
 
 MAPPING_turn = {
-    0: ("r_freq", "inc", 80, "Red"),
-    1: ("g_freq", "inc", 50, "Green"),
-    2: ("b_freq", "inc", 1, "Blue"),
-    3: ("px_scan_speed", "inc", 70, "Scan"),
+    0: ("r_freq", "inc", 80, "Red [q]"),
+    1: ("g_freq", "inc", 50, "Green [w]"),
+    2: ("b_freq", "inc", 1, "Blue [e]"),
+    3: ("px_scan_speed", "inc", 70, "Scan [r]"),
     4: ("", "", 110, "Kal"),
     5: ("k_n_segments", 12, 110, "Segments"),
     6: ("k_flip", 17, 100, "Flip"),
     7: ("increments", "*6+1", 70, "increments"),
-    8: ("k_manual_rot_curr", "k_manual_rot_curr", 120, ""),
+    8: ("k_manual_rot_curr", "k_manual_rot_curr", 120, "Kal Rotation"),
     9: ("", "", 120, ""),
     10: ("k_alternate_flip", 17, 100, "Flip 2"),
     11: ("", "", 120, ""),
@@ -55,10 +57,10 @@ MAPPING_click = {
 
 def k_rot_map(value):
     # value = int(value/2)
-    if value < 37:
-        return (value * 10, True)
+    if value < 74:
+        return (value * 5, True)
     else:
-        return ((value - 37) * 10, False)
+        return ((value - 74) * 5, False)
 
 
 @dataclass(unsafe_hash=True)
@@ -75,7 +77,7 @@ class Parameters:
     b_waveform_ix: int = 0
 
     px_scan_speed: int = 50
-    increments: int = 1
+    increments: int = 0
 
     kaleidoscope_ix: int = 0
     k_n_segments: int = 0
@@ -89,7 +91,8 @@ class Parameters:
     w: int = 600
     h: int = 600
 
-    need_update: bool = False
+    need_update: tuple = ()
+
     update_state: bool = False
 
     current_preset_num: int = 0
@@ -98,8 +101,9 @@ class Parameters:
         if name == "need_update":
             self.__dict__["need_update"] = value
         else:
+            #print("set", name, value)
             super().__setattr__(name, value)
-            self.need_update = True
+            self.need_update = self.need_update + (name,)
 
     @classmethod
     def from_dict(cls, d):
@@ -112,14 +116,15 @@ class Parameters:
 
 class Vizard():
     def __init__(self):
-        self.interface_mode = True
-        
+        self.interface_mode = False
+        self.increments = 1
         self.params = Parameters()
         self._w = self.params.w
         self._h = self.params.h
         self._winh = self.params.winh
         self._winw = self.params.winw
         self._numpix = self.params.w * self.params.h
+        self.px_scan_speed = int(self.params.px_scan_speed)
 
         self.waveforms_names = ["sin", "square", "noise",
                                 "constant", "triangle"]
@@ -133,7 +138,7 @@ class Vizard():
         self.bchannel = sg.SignalGenerator(self.waveforms, self._numpix,
                                            self.params.r_freq, id="blue")
 
-        self._k_ix = 0
+        self.k_ix = 0
         self.kal1 = kal.Multiscope(self.params.k_flip, self.params.w,
                                    self.params.k_n_segments,
                                    self.params.k_alternate_flip)
@@ -148,15 +153,8 @@ class Vizard():
                                    dtype=np.float32)
         self.presets = {}
         self.load_preset_lib()
-
-    @property
-    def k_ix(self):
-        return(self._k_ix)
-
-    @k_ix.setter
-    def k_ix(self, k_ix):
-        self._k_ix = k_ix % (len(self.kaleidoscopes))
-        self.params.kaleidoscope_ix = k_ix % (len(self.kaleidoscopes))
+        
+        self.extra_message = ""
 
     def load_preset_lib(self):
         print("Load Preset Lib")
@@ -170,79 +168,176 @@ class Vizard():
 
     def add_params_as_preset(self, number):
         p = self.params.to_dict().copy()
-        p["need_update"] = True
-        p["update_state"] = True
+        p["need_update"] = ()
+        print(p)
         self.presets[str(number)] = p
         self.save_preset_lib()
         return f"Added new Preset in {number}"
 
     def load_params_from_preset(self, number):
         stay_at_n = self.params.current_preset_num
-        self.params = Parameters.from_dict(self.presets[str(number)])
-        self.params.need_update = True
+        p = self.presets[str(number)]
+        p = tuplify(p)
+        print(p)
+        self.params = Parameters.from_dict(p)
+        update_names = (tuplify(list(self.presets[str(number)].keys())))
+        self.params.need_update = update_names
         self.params.update_state = True
         self.params.current_preset_num = stay_at_n
         return f"Loaded Preset from {number}"
 
+
     def update_params(self):
-        if self.params.need_update:
-            # Basics
-            self._w = self.params.w
-            self._h = self.params.h
-            self._winh = self.params.winh
-            self._winw = self.params.winw
-            self._numpix = self._w * self._h
-            # Signal Generators
-            self.rchannel.numpix = self._numpix
-            self.gchannel.numpix = self._numpix
-            self.bchannel.numpix = self._numpix
+        for name in self.params.need_update:
+            match name:
+                case "w":
+                    self._w = self.params.w
+                    self._numpix = self._w * self._h
+                    # Signal Generators
+                    self.rchannel.numpix = self._numpix
+                    self.gchannel.numpix = self._numpix
+                    self.bchannel.numpix = self._numpix
+                    self.kaleidoscopes[1].full_size = self.params.w
+                    self.kaleidoscopes[2].size = self.params.w
+                    self.kaleidoscopes[3].size = self.params.w
+                case "h":
+                    self._h = self.params.h
+                    self._numpix = self._w * self._h
+                    # Signal Generators
+                    self.rchannel.numpix = self._numpix
+                    self.gchannel.numpix = self._numpix
+                    self.bchannel.numpix = self._numpix
+                case "_winh":
+                    self._winh = self.params.winh
+                case "_winw":
+                    self._winw = self.params.winw
+                case "increments":
+                    self.increments = int((self.params.increments * 6) + 1)
+                case "px_scan_speed":
+                    self.px_scan_speed = int(self.params.px_scan_speed * self.increments)
+                case "r_freq":
+                    self.rchannel.freq = int(self.params.r_freq * self.increments)
+                case "g_freq":
+                    self.gchannel.freq = int(self.params.g_freq * self.increments)
+                case "b_freq":
+                    self.bchannel.freq = int(self.params.b_freq * self.increments)
+                case "r_waveform_ix":
+                    self.rchannel.waveform_ix = (self.params.r_waveform_ix) % len(self.waveforms)  #  click
+                case "g_waveform_ix":
+                    self.gchannel.waveform_ix = (self.params.g_waveform_ix) % len(self.waveforms)  #  click
+                case "b_waveform_ix":
+                    self.bchannel.waveform_ix = (self.params.b_waveform_ix) % len(self.waveforms)  #  click
+                case "kaleidoscope_ix":
+                    self.k_ix = (self.params.kaleidoscope_ix) % len(self.kaleidoscopes)  #  click
+                case "k_flip":
+                    self.kaleidoscopes[1].flipped = int(self.params.k_flip / 17)
+                    self.kaleidoscopes[2].flipped = int(self.params.k_flip / 17)
+                    self.kaleidoscopes[3].flipped = int(self.params.k_flip / 17)
+                case "k_alternate_flip":
+                    self.kaleidoscopes[1].alternate_flip = int(self.params.k_alternate_flip / 17)
+                    self.kaleidoscopes[2].alternate_flip = int(self.params.k_alternate_flip / 17)
+                case "k_n_segments":
+                    self.kaleidoscopes[1].n_segments = int(self.params.k_n_segments / 12)
+                    self.kaleidoscopes[2].n_segments = int(self.params.k_n_segments / 12)
+                case "k_manual_rot":
+                    if not len(self.params.k_manual_rot) == 0:
+                        self.kaleidoscopes[3].rotations = \
+                            [i[0] for i in self.params.k_manual_rot]
+                        self.kaleidoscopes[3].rotations_dir = \
+                            [i[1] for i in self.params.k_manual_rot]
+                    else:
+                        self.kaleidoscopes[3].rotations = []
+                        self.kaleidoscopes[3].rotations_dir = []
 
-            self.rchannel.freq = self.params.r_freq
-            self.gchannel.freq = self.params.g_freq
-            self.bchannel.freq = self.params.b_freq
-
-            self.rchannel.waveform_ix = self.params.r_waveform_ix
-            self.gchannel.waveform_ix = self.params.g_waveform_ix
-            self.bchannel.waveform_ix = self.params.b_waveform_ix
-            # Kaleidoscopes
-            self.k_ix = self.params.kaleidoscope_ix
-
-            self.kaleidoscopes[1].flipped = self.params.k_flip
-            self.kaleidoscopes[1].full_size = self.params.w
-            self.kaleidoscopes[1].n_segments = self.params.k_n_segments
-            self.kaleidoscopes[1].alternate_flip = self.params.k_alternate_flip
-
-            self.kaleidoscopes[2].flipped = self.params.k_flip
-            self.kaleidoscopes[2].size = self.params.w
-            self.kaleidoscopes[2].n_segments = self.params.k_n_segments
-            self.kaleidoscopes[2].alternate_flip = self.params.k_alternate_flip
-
-            self.kaleidoscopes[3].flipped = self.params.k_flip
-            self.kaleidoscopes[3].size = self.params.w
-            if len(self.params.k_manual_rot) \
-                    != len(self.kaleidoscopes[3].rotations):
-                if not len(self.params.k_manual_rot) == 0:
-                    self.kaleidoscopes[3].rotations = \
-                        [i[0] for i in self.params.k_manual_rot]
-                    self.kaleidoscopes[3].rotations_dir = \
-                        [i[1] for i in self.params.k_manual_rot]
-                else:
-                    self.kaleidoscopes[3].rotations = []
-                    self.kaleidoscopes[3].rotations_dir = []
-            if self.win_canvas.shape != (self.params.winh,
-                                         self.params.winw, 3):
-                self.win_canvas = \
-                    np.zeros((self.params.winh, self.params.winw, 3),
-                             dtype=np.float32)
+        #    if len(self.params.k_manual_rot) \
+        #           != len(self.kaleidoscopes[3].rotations):
+        #self.params.r_waveform_ix = self.rchannel.waveform_ix
+        #self.params.g_waveform_ix = self.gchannel.waveform_ix
+        #self.params.v_waveform_ix = self.bchannel.waveform_ix
+        #self.params.kaleidoscope_ix = self.k_ix
+        if self.win_canvas.shape != (self.params.winh,
+                                    self.params.winw, 3):
+            self.win_canvas = \
+                np.zeros((self.params.winh, self.params.winw, 3),
+                        dtype=np.float32)
 
 
-            if self.params.update_state:
-                self.rchannel.state = self.params.r_state
-                self.gchannel.state = self.params.g_state
-                self.bchannel.state = self.params.b_state
-                self.params.update_state = False
+        if self.params.update_state:
+            self.rchannel.state = self.params.r_state
+            self.gchannel.state = self.params.g_state
+            self.bchannel.state = self.params.b_state
+            self.params.update_state = False
 
-            self.params.need_update = False
+        if len(self.params.need_update) != 0:
+            self.print_table()
+            print(self.extra_message)
+            self.params.need_update = ()
+
+    def print_table(self):
+        # Color
+        R = "\033[0;31;40m"  # RED
+        # G = "\033[0;32;40m"  # GREEN
+        # Y = "\033[0;33;40m"  # Yellow
+        # B = "\033[0;34;40m"  # Blue
+        N = "\033[0m"  # Reset
+        tab = prettytable.PrettyTable()
+        tab.hrules = 1
+        tab.header = False
+
+        for i in range(4):
+            r = []
+            for j in range(4):
+                r.append(R + MAPPING_turn[(i * 4) + j][3] + N)
+            tab.add_row(r)
+            r = []
+            for j in range(4):
+                r.append(self.VIZfind(MAPPING_turn[(i * 4) + j][0]))
+            tab.add_row(r)
+            r = []
+            for j in range(4):
+                r.append(self.VIZfind(MAPPING_click[(i * 4) + j][0]))
+            tab.add_row(r)
+        if self.interface_mode:
+            os.system('clear')
+            print(tab)
+            print(f"K Man Rot {self.params.k_manual_rot}")
+
+    def VIZfind(self, name):
+        if name == "":
+            return ""
+        elif name == "kaleidoscope_ix":
+            return self.kal_names[self.k_ix]
+        elif name == "r_waveform_ix":
+            return self.waveforms_names[self.rchannel.waveform_ix]
+        elif name == "g_waveform_ix":
+            return self.waveforms_names[self.gchannel.waveform_ix]
+        elif name == "b_waveform_ix":
+            return self.waveforms_names[self.bchannel.waveform_ix]
+        elif name == "r_freq":
+            return self.rchannel.freq
+        elif name == "g_freq":
+            return self.gchannel.freq
+        elif name == "b_freq":
+            return self.bchannel.freq
+        elif name == "px_scan_speed":
+            return self.px_scan_speed
+        elif name == "k_n_segments":
+            return self.kaleidoscopes[1].n_segments
+        elif name == "k_flip":
+            return self.kaleidoscopes[1].flipped
+        elif name == "k_alternate_flip":
+            return self.kaleidoscopes[1].alternate_flip
+        elif name == "increments":
+            return self.increments
+        elif name == "Preset_save":
+            return "Save"
+        elif name == "Preset_load":
+            return "Load"
+        elif name == "k_manual_rot":
+            return self.params.k_manual_rot_curr
+        else:
+            return self.params.__dict__[name]
+
 
     def get_RGB(self, n_scanned_px):
         r = self.rchannel.get_series(n_scanned_px)
@@ -282,3 +377,8 @@ class Vizard():
                     rgb[(self.h - bottom):self.h, :, :][::-1, :, :]
         return self.win_canvas
 
+
+def tuplify(listything):
+    if isinstance(listything, list): return tuple(map(tuplify, listything))
+    if isinstance(listything, dict): return {k:tuplify(v) for k,v in listything.items()}
+    return listything
