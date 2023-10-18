@@ -1,0 +1,1 @@
+ffmpeg -y -i ex3.mov -filter_complex "fps=5,scale=480:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=32[p];[s1][p]paletteuse=dither=bayer" ex3.gif
