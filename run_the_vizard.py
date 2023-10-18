@@ -28,7 +28,6 @@ def computePixels():
     # get the signal
     rgb = VIZ.get_RGB(n_scanned_px)
     rgb = VIZ.apply_kaleidoscope(rgb)
-
     rgb = VIZ.embed_rgb_in_window(rgb)
     GLUT.glutPostRedisplay()
     return rgb
@@ -39,7 +38,7 @@ def draw():
     GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
     pix = computePixels()
     # assert pix.shape == (WINH, WINW, 3)
-    GL.glDrawPixels(VIZ._winw, VIZ._winh, GL.GL_RGB, GL.GL_FLOAT,
+    GL.glDrawPixels(VIZ.winw, VIZ.winh, GL.GL_RGB, GL.GL_FLOAT,
                     pix.reshape(-1).data)
     GL.glFlush()
 
@@ -57,26 +56,26 @@ def handle_midi(message):
     extra_message = "Extra"
     # turn events
     if message.channel == 0:
-        print("turn")
+        #print("turn")
         name = MAPPING_turn[dial][0]
         if MAPPING_turn[dial][1] == "k_manual_rot_curr":
             value = k_rot_map(int(value))
             name = "k_manual_rot_curr"
-        print("set", name, value)
+        #print("set", name, value)
         VIZ.params.__setattr__(name, value)
     
     #press in events
     if (message.channel == 1) and (message.value == 127):
-        print("press")
+        #print("press")
         if MAPPING_click[dial][1] == "k_manual_rot":
             LAST8CLICK = time.time()
 
     # release events
     if (message.channel == 1) and (message.value == 0):
         extra_message = f"regclick,, {VIZ.params.current_preset_num}"
-        print("release", extra_message)
+        #print("release", extra_message)
         name = MAPPING_click[dial][0]
-        print(f"release {name}")
+        #print(f"release {name}")
         if name == "Preset_load":
             thispreset = VIZ.params.current_preset_num
             print(f" loading {thispreset}")
@@ -87,14 +86,18 @@ def handle_midi(message):
                 print(f"Could not load Preset {thispreset}")
                 print(e)
                 raise
-            send_dataclass_to_midi(OUTPORT, VIZ.params)
+            send_dataclass_to_midi(OUTPORT, VIZ.params, keyboard.PSEUDOKNOBS)
         elif name == "Preset_save":
+            thispreset = VIZ.params.current_preset_num
             try:
                 extra_message = \
-                    VIZ.add_params_as_preset(VIZ.params.current_preset_num)
+                    VIZ.add_params_as_preset(thispreset)
             except:
                 print(f"Could not save Preset {thispreset}")
                 raise
+        elif name == "Refl_load":
+            thispreset = VIZ.params.current_refl_num
+            VIZ.load_reflection_from_preset(thispreset)
         elif name == "k_manual_rot":
             now = time.time()
             extra_message = f"Deleting Rotations {now - LAST8CLICK}"
@@ -124,19 +127,15 @@ def reshape_me(newWidth, newHeight):
 
 
 def send_dataclass_to_midi(outport, params, PSEUDOKNOBS):
+    print("sending midi")
     for chan in MAPPING_turn.keys():
         name = MAPPING_turn[chan][0]
         if name != "":
-            if MAPPING_turn[chan][1] == "inc":
-                pass
-                #val = int(params.__dict__[name] / params.increments)
+            if name == "k_manual_rot_curr":
                 val = 0
-            elif type(MAPPING_turn[chan][1]) == int:
-                val = params.__dict__[name] * MAPPING_turn[chan][1]
-            elif MAPPING_turn[chan][1] == "*6+1":
-                val = VIZ.increments#int((params.__dict__[name] / 6) - 1)
-            elif MAPPING_turn[chan][1] == "preset":
+            else:
                 val = int(params.__dict__[name])
+
             if outport != "kb_only":
                 # send value
                 msg = mido.Message('control_change', channel=0, control=chan,

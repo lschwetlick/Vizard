@@ -7,7 +7,7 @@ import prettytable
 import os
 
 PRESETFILE = "preset_lib.json"
-
+REFLECTIONFILE = "kal_rotations_lib.json"
 
 def reset_states(p):
     p.r_state = 0
@@ -21,16 +21,16 @@ MAPPING_turn = {
     1: ("g_freq", "inc", 50, "Green [w]"),
     2: ("b_freq", "inc", 1, "Blue [e]"),
     3: ("px_scan_speed", "inc", 70, "Scan [r]"),
-    4: ("", "", 110, "Kal"),
-    5: ("k_n_segments", 12, 110, "Segments"),
+    4: ("", "", 100, "Kal"),
+    5: ("k_n_segments", 12, 100, "Segments"),
     6: ("k_flip", 17, 100, "Flip"),
     7: ("increments", "*6+1", 70, "increments"),
-    8: ("k_manual_rot_curr", "k_manual_rot_curr", 120, "Kal Rotation"),
+    8: ("k_manual_rot_curr", "k_manual_rot_curr", 100, "Kal Rotation"),
     9: ("", "", 120, ""),
     10: ("k_alternate_flip", 17, 100, "Flip 2"),
     11: ("", "", 120, ""),
     12: ("", "", 1, ""),
-    13: ("", "", 1, ""),
+    13: ("current_refl_num", "", 50, ""),
     14: ("", "", 60, ""),
     15: ("current_preset_num", "preset", 60, "Preset")
 }
@@ -49,7 +49,7 @@ MAPPING_click = {
     10: ("", "", 120),
     11: ("", "", 120),
     12: ("", "", 120),
-    13: ("", "", 120),
+    13: ("Refl_load", "load", 120),
     14: ("Preset_save", "save", 60),
     15: ("Preset_load", "load", 60)
 }
@@ -96,6 +96,7 @@ class Parameters:
     update_state: bool = False
 
     current_preset_num: int = 0
+    current_refl_num: int = 0
 
     def __setattr__(self, name, value):
         if name == "need_update":
@@ -119,10 +120,10 @@ class Vizard():
         self.interface_mode = False
         self.increments = 1
         self.params = Parameters()
-        self._w = self.params.w
-        self._h = self.params.h
-        self._winh = self.params.winh
-        self._winw = self.params.winw
+        self.w = self.params.w
+        self.h = self.params.h
+        self.winh = self.params.winh
+        self.winw = self.params.winw
         self._numpix = self.params.w * self.params.h
         self.px_scan_speed = int(self.params.px_scan_speed)
 
@@ -152,9 +153,23 @@ class Vizard():
         self.win_canvas = np.empty((self.params.winh, self.params.winw, 3),
                                    dtype=np.float32)
         self.presets = {}
+        #self.refl_presets = {}
         self.load_preset_lib()
-        
+        self.load_reflection_lib()
         self.extra_message = ""
+
+    def load_reflection_lib(self):
+        print("Load Reflection Lib")
+        with open(REFLECTIONFILE, 'r') as f:
+            self.refl_presets = json.load(f)
+
+    def load_reflection_from_preset(self, number):
+        self.load_reflection_lib()
+        p = self.refl_presets[str(number)]
+        p = tuplify(p)
+        self.params.k_manual_rot = p
+        return f"Loaded Reflections from {number}"
+
 
     def load_preset_lib(self):
         print("Load Preset Lib")
@@ -191,8 +206,8 @@ class Vizard():
         for name in self.params.need_update:
             match name:
                 case "w":
-                    self._w = self.params.w
-                    self._numpix = self._w * self._h
+                    self.w = self.params.w
+                    self._numpix = self.w * self.h
                     # Signal Generators
                     self.rchannel.numpix = self._numpix
                     self.gchannel.numpix = self._numpix
@@ -201,16 +216,18 @@ class Vizard():
                     self.kaleidoscopes[2].size = self.params.w
                     self.kaleidoscopes[3].size = self.params.w
                 case "h":
-                    self._h = self.params.h
-                    self._numpix = self._w * self._h
+                    self.h = self.params.h
+                    self._numpix = self.w * self.h
                     # Signal Generators
                     self.rchannel.numpix = self._numpix
                     self.gchannel.numpix = self._numpix
                     self.bchannel.numpix = self._numpix
-                case "_winh":
-                    self._winh = self.params.winh
-                case "_winw":
-                    self._winw = self.params.winw
+                case "winh":
+                    self.winh = self.params.winh
+                    print("set", self.winh)
+                case "winw":
+                    self.winw = self.params.winw
+                    print("set", self.winw)
                 case "increments":
                     self.increments = int((self.params.increments * 6) + 1)
                 case "px_scan_speed":
@@ -255,10 +272,10 @@ class Vizard():
         #self.params.g_waveform_ix = self.gchannel.waveform_ix
         #self.params.v_waveform_ix = self.bchannel.waveform_ix
         #self.params.kaleidoscope_ix = self.k_ix
-        if self.win_canvas.shape != (self.params.winh,
-                                    self.params.winw, 3):
+        if self.win_canvas.shape != (self.winh,
+                                    self.winw, 3):
             self.win_canvas = \
-                np.zeros((self.params.winh, self.params.winw, 3),
+                np.zeros((self.winh, self.winw, 3),
                         dtype=np.float32)
 
 
@@ -300,6 +317,7 @@ class Vizard():
         if self.interface_mode:
             os.system('clear')
             print(tab)
+            print(self.winh, self.winw)
             print(f"K Man Rot {self.params.k_manual_rot}")
 
     def VIZfind(self, name):
@@ -335,6 +353,8 @@ class Vizard():
             return "Load"
         elif name == "k_manual_rot":
             return self.params.k_manual_rot_curr
+        elif name == "Refl_load":
+            return "Load Reflection"
         else:
             return self.params.__dict__[name]
 
@@ -343,7 +363,7 @@ class Vizard():
         r = self.rchannel.get_series(n_scanned_px)
         g = self.gchannel.get_series(n_scanned_px)
         b = self.bchannel.get_series(n_scanned_px)
-        rgb = np.array([r, g, b]).T.reshape(self._w, self._h, 3)
+        rgb = np.array([r, g, b]).T.reshape(self.w, self.h, 3)
         return rgb
 
     def apply_kaleidoscope(self, rgb):
@@ -352,18 +372,18 @@ class Vizard():
         return rgb
 
     def embed_rgb_in_window(self, rgb):
-        leftover_w = self._winw - self._w
+        leftover_w = self.winw - self.w
         left = int(leftover_w / 2)
         right = leftover_w - left
 
-        leftover_h = self._winh - self._h
+        leftover_h = self.winh - self.h
         top = int(leftover_h / 2)
         bottom = leftover_h - top
 
         reflect = False
         if not reflect:
-            self.win_canvas[top:(top + self._h),
-                            left:(left + self._w), :] = rgb
+            self.win_canvas[top:(top + self.h),
+                            left:(left + self.w), :] = rgb
         else:
             if left > 1:
                 # print(rgb[:, 0:left, :].shape)
