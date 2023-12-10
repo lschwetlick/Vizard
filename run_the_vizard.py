@@ -6,16 +6,16 @@ import os
 
 import mido
 
-from viz_manager import Vizard, MAPPING_turn, MAPPING_click, k_rot_map
+from viz_manager import Vizard
 import prettytable
 
 import keyboard
-
+import midi_controls
+from GUI import print_table
 
 VIZ = Vizard()
 T1 = time.time()
 UPDATESPEED = 66  # in ms
-LAST8CLICK = 0
 
 
 def computePixels():
@@ -48,69 +48,38 @@ def draw():
 
 
 def handle_midi(message):
-    global VIZ, a1, OUTPORT, LAST8CLICK
+    global VIZ
+    try:
+        dial = message.control
+        value = message.value
+        extra_message = "Extra"
 
-    dial = message.control
-    value = message.value
-    keyboard.PSEUDOKNOBS[dial].value = value
-    extra_message = "Extra"
-    # turn events
-    if message.channel == 0:
-        #print("turn")
-        name = MAPPING_turn[dial][0]
-        if MAPPING_turn[dial][1] == "k_manual_rot_curr":
-            value = k_rot_map(int(value))
-            name = "k_manual_rot_curr"
-        #print("set", name, value)
-        VIZ.params.__setattr__(name, value)
-    
-    #press in events
-    if (message.channel == 1) and (message.value == 127):
-        #print("press")
-        if MAPPING_click[dial][1] == "k_manual_rot":
-            LAST8CLICK = time.time()
+        # TURN EVENTS
+        if message.channel == 0:
+            # update internal representation of knobs
+            keyboard.PSEUDOKNOBS[dial].value = value
+            midi_controls.MIDIKNOBS[dial].value = value
+            # execute turn function
+            try:
+                VIZ = midi_controls.MIDIKNOBS[dial].turn(VIZ)
+            except Exception as X:
+                print(X)
 
-    # release events
-    if (message.channel == 1) and (message.value == 0):
-        extra_message = f"regclick,, {VIZ.params.current_preset_num}"
-        #print("release", extra_message)
-        name = MAPPING_click[dial][0]
-        #print(f"release {name}")
-        if name == "Preset_load":
-            thispreset = VIZ.params.current_preset_num
-            print(f" loading {thispreset}")
-            try:
-                extra_message = \
-                    VIZ.load_params_from_preset(thispreset)
-            except Exception as e:
-                print(f"Could not load Preset {thispreset}")
-                print(e)
-                raise
-            send_dataclass_to_midi(OUTPORT, VIZ.params, keyboard.PSEUDOKNOBS)
-        elif name == "Preset_save":
-            thispreset = VIZ.params.current_preset_num
-            try:
-                extra_message = \
-                    VIZ.add_params_as_preset(thispreset)
-            except:
-                print(f"Could not save Preset {thispreset}")
-                raise
-        elif name == "Refl_load":
-            thispreset = VIZ.params.current_refl_num
-            VIZ.load_reflection_from_preset(thispreset)
-        elif name == "k_manual_rot":
-            now = time.time()
-            extra_message = f"Deleting Rotations {now - LAST8CLICK}"
-            if ((now - LAST8CLICK) > 2) & ((now - LAST8CLICK) < 10):
-                VIZ.params.k_manual_rot = ()
+        # CLICK IN EVENTS
+        if (message.channel == 1) and (message.value == 127):
+            # register click in time for longclick detection
+            midi_controls.MIDIKNOBS[dial].click_in_timer = time.time()
+        # RELEASE EVENTS
+        if (message.channel == 1) and (message.value == 0):
+            #VIZ.extra_message = f"regclick,, {VIZ.params.current_preset_num}"
+            if midi_controls.MIDIKNOBS[dial].is_longclick():
+                midi_controls.MIDIKNOBS[dial].longclick_out(VIZ)
             else:
-                VIZ.params.k_manual_rot = \
-                    VIZ.params.k_manual_rot + (VIZ.params.k_manual_rot_curr,)
-        elif name == "update_state":
-            MAPPING_click[dial][1](VIZ.params)
-        else:
-            val = VIZ.params.__getattribute__(name) + 1
-            VIZ.params.__setattr__(name, val)
+                midi_controls.MIDIKNOBS[dial].click_out(VIZ)
+            print_table(midi_controls.MIDIKNOBS, VIZ.params.to_dict(), "CLICK")
+
+    except Exception as X:
+        print(X)
 
 
 def reshape_me(newWidth, newHeight):
@@ -128,8 +97,8 @@ def reshape_me(newWidth, newHeight):
 
 def send_dataclass_to_midi(outport, params, PSEUDOKNOBS):
     print("sending midi")
-    for chan in MAPPING_turn.keys():
-        name = MAPPING_turn[chan][0]
+    for chan in midi_controls.MIDIKNOBS.keys():
+        name = midi_controls.MIDIKNOBS[chan].turn_var
         if name != "":
             if name == "k_manual_rot_curr":
                 val = 0
@@ -144,13 +113,14 @@ def send_dataclass_to_midi(outport, params, PSEUDOKNOBS):
             PSEUDOKNOBS[chan].value = val
         if outport != "kb_only":
             # send col
-            col = MAPPING_turn[chan][2]
+            col = midi_controls.MIDIKNOBS[chan].color
             msg = mido.Message('control_change', channel=1, control=chan,
                                value=col, time=0)
             outport.send(msg)
 
 
 def on_key(key, x, y):
+    global VIZ, OUTPORT
     if key in keyboard.KEYSMAP.keys():
         keyboard.KEYSMAP[key][1]()
         msg = keyboard.KEYSMAP[key][0]()
