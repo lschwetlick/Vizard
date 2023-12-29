@@ -48,38 +48,47 @@ def draw():
 
 
 def handle_midi(message):
-    global VIZ
+    global VIZ, OUTPORT
+    VIZ.midi_msg_str = "time: " + str(time.time())[:10] + " " + str(message)
     try:
         dial = message.control
         value = message.value
-        extra_message = "Extra"
-
         # TURN EVENTS
         if message.channel == 0:
-            # update internal representation of knobs
-            keyboard.PSEUDOKNOBS[dial].value = value
-            midi_controls.MIDIKNOBS[dial].value = value
-            # execute turn function
-            try:
-                VIZ = midi_controls.MIDIKNOBS[dial].turn(VIZ)
-            except Exception as X:
-                print(X)
+            # blocks any accidental turn events during a click
+            if not midi_controls.MIDIKNOBS[dial].isclicked:
+                # update internal representation of knobs
+                keyboard.PSEUDOKNOBS[dial].value = value
+                midi_controls.MIDIKNOBS[dial].value = value
+                # execute turn function
+                try:
+                    VIZ = midi_controls.MIDIKNOBS[dial].turn(VIZ)
+                except Exception as X:
+                    print(X)
 
+        current_turn_value = midi_controls.MIDIKNOBS[dial].value
         # CLICK IN EVENTS
         if (message.channel == 1) and (message.value == 127):
             # register click in time for longclick detection
-            midi_controls.MIDIKNOBS[dial].click_in_timer = time.time()
+            midi_controls.MIDIKNOBS[dial].click_in()
+            midi_controls.MIDIKNOBS[dial].isclicked = True
         # RELEASE EVENTS
         if (message.channel == 1) and (message.value == 0):
-            #VIZ.extra_message = f"regclick,, {VIZ.params.current_preset_num}"
+            midi_controls.MIDIKNOBS[dial].isclicked = False
             if midi_controls.MIDIKNOBS[dial].is_longclick():
                 midi_controls.MIDIKNOBS[dial].longclick_out(VIZ)
             else:
                 midi_controls.MIDIKNOBS[dial].click_out(VIZ)
             print_table(midi_controls.MIDIKNOBS, VIZ.params.to_dict(), "CLICK")
 
+        # logic for register changes
+        if midi_controls.MIDIKNOBS[dial].value != current_turn_value:
+            msg = mido.Message('control_change', channel=0, control=dial,
+                               value=midi_controls.MIDIKNOBS[dial].value,
+                               time=0)
+            OUTPORT.send(msg)
     except Exception as X:
-        print(X)
+        VIZ.error_msg = X
 
 
 def reshape_me(newWidth, newHeight):
