@@ -31,7 +31,7 @@ class Parameters:
     k_n_segments: int = 0
     k_flip: int = 1
     k_alternate_flip: int = 1
-    k_manual_rot_curr: tuple = ()
+    k_manual_rot_curr: tuple = (None, None)
     k_manual_rot: tuple = ((120, True), (240, True), (360, True))
 
     winw: int = 600
@@ -66,6 +66,7 @@ class Parameters:
 class Vizard():
     def __init__(self):
         self.interface_mode = True
+        self.debugmode = True
         self.increments = 1
         self.params = Parameters()
         self.w = self.params.w
@@ -100,6 +101,9 @@ class Vizard():
         self.load_preset_lib()
         self.load_reflection_lib()
         self.extra_message = ""
+        self.debug_message = ""
+        self.midi_msg_str = ""
+        self.error_message = ""
 
     def load_reflection_lib(self):
         print("Load Reflection Lib")
@@ -223,7 +227,15 @@ class Vizard():
             self.params.update_state = False
 
         if len(self.params.need_update) != 0:
-            print_table(MIDIKNOBS, self.params.to_dict(), self.extra_message)
+            if self.interface_mode:
+                print_table(MIDIKNOBS, self.params.to_dict(), self.extra_message)
+                print("Width, Height: " + str([self.w, self.h,]) +
+                      "; Window Size: " + str([self.winw, self.winh]))
+                print("Rotations List: " + str(self.params.k_manual_rot))
+                print(str(self.error_message))
+            if self.debugmode:
+                print(self.midi_msg_str)
+                print(self.debug_message)
             self.params.need_update = ()
 
     def get_RGB(self, n_scanned_px):
