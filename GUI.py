@@ -33,7 +33,7 @@ table_dict = {
         1: "B + waveforms_names[parameters['r_waveform_ix']] + N",
         2: "B + waveforms_names[parameters['g_waveform_ix']] + N",
         3: "B + waveforms_names[parameters['b_waveform_ix']] + N",
-        4: "Y + 'RESET'                          + N",
+        4: "B + 'RESET'                          + N",
     },
     4: {
         1: "RB + 'Kaleidoscope' + N",
