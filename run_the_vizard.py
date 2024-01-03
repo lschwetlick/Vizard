@@ -28,7 +28,7 @@ def computePixels():
     # get the signal
     rgb = VIZ.get_RGB(n_scanned_px)
     rgb = VIZ.apply_kaleidoscope(rgb)
-    rgb = VIZ.embed_rgb_in_window(rgb)
+    #rgb = VIZ.embed_rgb_in_window(rgb)
     GLUT.glutPostRedisplay()
     return rgb
 
@@ -38,8 +38,8 @@ def draw():
     GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
     pix = computePixels()
     # assert pix.shape == (WINH, WINW, 3)
-    GL.glDrawPixels(VIZ.winw, VIZ.winh, GL.GL_RGB, GL.GL_FLOAT,
-                    pix.reshape(-1).data)
+    #pix_uint8 = (pix * 256).astype('uint8')
+    GL.glDrawPixels(VIZ.winw, VIZ.winh, GL.GL_RGB, GL.GL_UNSIGNED_BYTE, pix.data)
     GL.glFlush()
 
     # print(f"flip took {(time.time() - T1)}")

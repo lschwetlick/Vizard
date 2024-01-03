@@ -95,7 +95,7 @@ class Vizard():
                                                 self.params.w)
         self.kaleidoscopes = [None, self.kal1, self.kal2, self.kal3]
         self.win_canvas = np.empty((self.params.winh, self.params.winw, 3),
-                                   dtype=np.float32)
+                                   dtype=np.uint8)
         self.presets = {}
         #self.refl_presets = {}
         self.load_preset_lib()
@@ -217,7 +217,7 @@ class Vizard():
 
         if self.win_canvas.shape != (self.winh, self.winw, 3):
             self.win_canvas = np.zeros((self.winh, self.winw, 3),
-                                       dtype=np.float32)
+                                       dtype=np.uint8)
 
 
         if self.params.update_state:
