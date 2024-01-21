@@ -38,8 +38,7 @@ def draw():
     GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
     pix = computePixels()
     # assert pix.shape == (WINH, WINW, 3)
-    GL.glDrawPixels(VIZ.winw, VIZ.winh, GL.GL_RGB, GL.GL_FLOAT,
-                    pix.reshape(-1).data)
+    GL.glDrawPixels(VIZ.winw, VIZ.winh, GL.GL_RGB, GL.GL_FLOAT, pix.data)
     GL.glFlush()
 
     # print(f"flip took {(time.time() - T1)}")
